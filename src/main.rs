@@ -131,6 +131,12 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>, app: &mut
                         KeyCode::Char(' ') => {
                             toggle_playback(app);
                         },
+                        KeyCode::Left => {
+                            seek(app, -5);
+                        },
+                        KeyCode::Right => {
+                            seek(app, 5);
+                        },
                         KeyCode::Up => {
                             next_track(app, -1);
                         },
@@ -288,6 +294,28 @@ fn toggle_playback(app: &mut App) {
             app.playback_state = PlaybackState::Playing;
             app.playback_start = Some(Instant::now() - app.position);
         }
+    }
+}
+
+fn seek(app: &mut App, seconds: i64) {
+    let new_pos = app.position.as_secs() as i64 + seconds;
+    let duration = app.tracks[app.current_track].duration.as_secs() as i64;
+    let new_pos = new_pos.clamp(0, duration) as u64;
+
+    app.position = Duration::from_secs(new_pos);
+    
+    if let (Some(sink), PlaybackState::Playing) = (&app.sink, &app.playback_state) {
+        sink.stop();
+
+        if let Ok(file) = std::fs::File::open(&app.tracks[app.current_track].path) {
+            if let Ok(mut source) = Decoder::new(std::io::BufReader::new(file)) {
+                source.try_seek(app.position).ok();
+                sink.append(source);
+                app.playback_start = Some(Instant::now() - app.position);
+            }
+        }
+    } else if let Some(playback_start) = app.playback_start {
+        app.playback_start = Some(playback_start);
     }
 }
 
