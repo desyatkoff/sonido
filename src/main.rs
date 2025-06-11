@@ -157,6 +157,7 @@ USAGE:
 
 OPTIONS:
     -h, --help       Print this help message
+    -r, --recursive  Get music files from all subdirectories
     -v, --version    Print version
             "#
         );
