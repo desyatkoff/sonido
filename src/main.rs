@@ -7,7 +7,7 @@ the Free Software Foundation, either version 3 of the License, or
 */
 
 use std::{
-    env, fs,
+    env,
     path::{
         Path,
         PathBuf,
@@ -39,10 +39,12 @@ use ratatui::{
     widgets::{
         Block,
         Borders,
+        Gauge,
         List,
         ListItem,
         ListState,
         Paragraph,
+        Wrap,
     },
     Frame,
 };
@@ -52,12 +54,44 @@ use rodio::{
     Sink,
     Source,
 };
+use walkdir::WalkDir;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 struct Track {
     path: PathBuf,
     duration: Duration,
+    metadata: Metadata,
+}
+#[derive(Default)]
+struct Metadata {
+    title: Option<String>,
+    artist: Option<String>,
+    album: Option<String>,
+    year: Option<String>,
+}
+
+impl Metadata {
+    fn from_path(path: &Path) -> Self {
+        let file_name = path
+            .file_stem()
+            .and_then(|n| n.to_str())
+            .unwrap_or("Unknown")
+            .to_string();
+
+        if let Some((artist, title)) = file_name.split_once(" - ") {
+            return Self {
+                title: Some(title.to_string()),
+                artist: Some(artist.to_string()),
+                ..Default::default()
+            };
+        } else {
+            return Self {
+                title: Some(file_name),
+                ..Default::default()
+            };
+        }
+    }
 }
 
 struct App {
@@ -78,12 +112,9 @@ enum PlaybackState {
 }
 
 fn main() -> Result<()> {
-    let music_directory = env::args()
-        .nth(1)
-        .map(PathBuf::from)
-        .unwrap_or_else(|| env::current_dir().unwrap());
-
-    let tracks = scan_music_files(&music_directory)?;
+    let args: Vec<String> = env::args().collect();
+    let (recursive, music_directory) = parse_args(&args);
+    let tracks = scan_music_files(&music_directory, recursive)?;
 
     if tracks.is_empty() {
         anyhow::bail!("No music files found in {}", music_directory.display());
@@ -115,6 +146,29 @@ fn main() -> Result<()> {
     terminal.show_cursor()?;
 
     return result;
+}
+
+fn parse_args(args: &[String]) -> (bool, PathBuf) {
+    let mut recursive = false;
+    let mut music_directory = None;
+
+    for arg in args.iter().skip(1) {
+        match arg.as_str() {
+            "--recursive" | "-r" => {
+                recursive = true;
+            },
+            _ if arg.starts_with('-') => {},
+            _ => {
+                if music_directory.is_none() {
+                    music_directory = Some(PathBuf::from(arg));
+                }
+            }
+        }
+    }
+
+    let music_directory = music_directory.unwrap_or_else(|| env::current_dir().unwrap());
+
+    return (recursive, music_directory);
 }
 
 fn run_app(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>, app: &mut App) -> Result<()> {
@@ -169,6 +223,16 @@ fn ui(f: &mut Frame, app: &App) {
         ])
         .split(f.area());
 
+    let center_layout = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage(50),
+            Constraint::Percentage(50),
+        ])
+        .split(layout[1]);
+
+    let track = &app.tracks[app.current_track];
+
     let title = Block::default()
         .borders(Borders::ALL)
         .border_set(border::ROUNDED)
@@ -183,19 +247,27 @@ fn ui(f: &mut Frame, app: &App) {
         .iter()
         .enumerate()
         .map(|(i, track)| {
-            let name = track
-                .path
-                .file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or("Unknown");
-
+            let display_name = track
+                .metadata
+                .title
+                .as_ref()
+                .cloned()
+                .unwrap_or_else(|| {
+                    track
+                        .path
+                        .file_stem()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or("Unknown")
+                        .to_string()
+                });
+            
             let style = if i == app.current_track {
                 Style::default().fg(Color::Blue)
             } else {
                 Style::default().fg(Color::White)
             };
-
-            return ListItem::new(name).style(style);
+            
+            return ListItem::new(display_name).style(style);
         })
         .collect();
 
@@ -204,32 +276,86 @@ fn ui(f: &mut Frame, app: &App) {
             Block::default()
                 .borders(Borders::ALL)
                 .border_set(border::ROUNDED)
-                .border_style(Style::default().fg(Color::Blue)),
+                .border_style(Style::default().fg(Color::Blue))
+                .title(" Playlist "),
         )
         .highlight_style(Style::default().bold());
 
-    f.render_stateful_widget(list, layout[1], &mut app.list_state.clone());
+    f.render_stateful_widget(list, center_layout[0], &mut app.list_state.clone());
 
-    let track = &app.tracks[app.current_track];
-    let progress = format!(
+    let metadata = &track.metadata;
+    let mut lines = vec![
+        Line::from(vec![
+            Span::styled("Title: ", Style::default().fg(Color::Blue)),
+            Span::raw(
+                metadata
+                    .title
+                    .as_deref()
+                    .unwrap_or("Unknown")
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled("Artist: ", Style::default().fg(Color::Blue)),
+            Span::raw(
+                metadata
+                    .artist
+                    .as_deref()
+                    .unwrap_or("Unknown")
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled("Duration: ", Style::default().fg(Color::Blue)),
+            Span::raw(format_duration(track.duration)),
+        ]),
+    ];
+
+    if let Some(album) = &metadata.album {
+        lines.push(Line::from(vec![
+            Span::styled("Album: ", Style::default().fg(Color::Blue)),
+            Span::raw(album),
+        ]));
+    }
+
+    if let Some(year) = &metadata.year {
+        lines.push(Line::from(vec![
+            Span::styled("Year: ", Style::default().fg(Color::Blue)),
+            Span::raw(year),
+        ]));
+    }
+
+    let metadata_block = Block::default()
+        .borders(Borders::ALL)
+        .border_set(border::ROUNDED)
+        .border_style(Style::default().fg(Color::Blue))
+        .title(" Metadata ");
+    let metadata_widget = Paragraph::new(lines)
+        .block(metadata_block)
+        .wrap(Wrap { trim: true });
+
+    f.render_widget(metadata_widget, center_layout[1]);
+
+    let progress = app.position.as_secs_f64() / track.duration.as_secs_f64();
+    let progress_text = format!(
         "{} / {}",
         format_duration(app.position),
         format_duration(track.duration)
     );
-
-    let progress_bar = Paragraph::new(progress)
+    let progress_gauge = Gauge::default()
         .block(
             Block::default()
                 .borders(Borders::ALL)
                 .border_set(border::ROUNDED)
                 .border_style(Style::default().fg(Color::Blue)),
         )
-        .alignment(Alignment::Center);
+        .gauge_style(Style::default().fg(Color::Blue))
+        .ratio(progress)
+        .label(progress_text)
+        .use_unicode(true);
 
-    f.render_widget(progress_bar, layout[2]);
+    f.render_widget(progress_gauge, layout[2]);
 }
 
-fn scan_music_files(dir: &Path) -> Result<Vec<Track>> {
+fn scan_music_files(dir: &Path, recursive: bool) -> Result<Vec<Track>> {
     let mut tracks = Vec::new();
     let extensions = [
         "mp3",
@@ -242,14 +368,26 @@ fn scan_music_files(dir: &Path) -> Result<Vec<Track>> {
         "m4a"
     ];
 
-    for entry in fs::read_dir(dir)? {
-        let path = entry?.path();
+    let walker = if recursive {
+        WalkDir::new(dir).into_iter()
+    } else {
+        WalkDir::new(dir).max_depth(1).into_iter()
+    };
+
+    for entry in walker.filter_map(|e| e.ok()) {
+        let path = entry.path();
+
         if path.is_file() {
             if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
                 if extensions.contains(&ext.to_lowercase().as_str()) {
-                    let duration = get_audio_duration(&path)?;
+                    let duration = get_audio_duration(path).unwrap_or(Duration::ZERO);
+                    let metadata = Metadata::from_path(path);
 
-                    tracks.push(Track { path, duration });
+                    tracks.push(Track {
+                        path: path.to_path_buf(),
+                        duration,
+                        metadata,
+                    });
                 }
             }
         }
@@ -303,7 +441,7 @@ fn seek(app: &mut App, seconds: i64) {
     let new_pos = new_pos.clamp(0, duration) as u64;
 
     app.position = Duration::from_secs(new_pos);
-    
+
     if let (Some(sink), PlaybackState::Playing) = (&app.sink, &app.playback_state) {
         sink.stop();
 
@@ -311,6 +449,7 @@ fn seek(app: &mut App, seconds: i64) {
             if let Ok(mut source) = Decoder::new(std::io::BufReader::new(file)) {
                 source.try_seek(app.position).ok();
                 sink.append(source);
+
                 app.playback_start = Some(Instant::now() - app.position);
             }
         }
