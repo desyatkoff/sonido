@@ -3,7 +3,7 @@ Copyright (C) 2025 Desyatkov Sergey
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+(at your option) any later version
 */
 
 use std::{
@@ -146,8 +146,46 @@ enum PlaybackState {
 
 fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
-    let (recursive, music_directory) = parse_args(&args);
+    let (help, recursive, version, music_directory) = parse_args(&args);
     let tracks = scan_music_files(&music_directory, recursive)?;
+
+    if help {
+        println!(
+            r#"
+USAGE:
+    sonido [OPTIONS] [PATH]
+
+OPTIONS:
+    -h, --help       Print this help message
+    -v, --version    Print version
+            "#
+        );
+
+        return Ok(());
+    } else if version {
+        println!(
+            r#"
+ ____              _     _       
+/ ___|  ___  _ __ (_) __| | ___  
+\___ \ / _ \| '_ \| |/ _` |/ _ \ 
+ ___) | (_) | | | | | (_| | (_) |
+|____/ \___/|_| |_|_|\__,_|\___/
+
+Sonido v{}
+A sleek, terminal-based music player written in Rust
+
+Copyright (C) 2025 Desyatkov Sergey
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version
+            "#,
+            VERSION
+        );
+
+        return Ok(());
+    }
 
     if tracks.is_empty() {
         anyhow::bail!("No music files found in {}", music_directory.display());
@@ -181,15 +219,23 @@ fn main() -> Result<()> {
     return result;
 }
 
-fn parse_args(args: &[String]) -> (bool, PathBuf) {
+fn parse_args(args: &[String]) -> (bool, bool, bool, PathBuf) {
+    let mut help = false;
     let mut recursive = false;
+    let mut version = false;
     let mut music_directory = None;
 
     for arg in args.iter().skip(1) {
         match arg.as_str() {
+            "-h" | "--help" => {
+                help = true;
+            },
             "-r" | "--recursive" => {
                 recursive = true;
             },
+            "-v" | "--version" => {
+                version = true;
+            }
             _ if arg.starts_with('-') => {},
             _ => {
                 if music_directory.is_none() {
@@ -201,7 +247,7 @@ fn parse_args(args: &[String]) -> (bool, PathBuf) {
 
     let music_directory = music_directory.unwrap_or_else(|| env::current_dir().unwrap());
 
-    return (recursive, music_directory);
+    return (help, recursive, version, music_directory);
 }
 
 fn run_app(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>, app: &mut App) -> Result<()> {
