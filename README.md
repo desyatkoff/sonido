@@ -21,10 +21,10 @@ A sleek, terminal-based music player written in Rust
 3. [Table of Contents](#table-of-contents)
 4. [Features](#features)
 5. [Controls](#controls)
-6. [Guide](#guide)
-    * 6.1. [Installation](#installation)
-    * 6.2. [Usage](#usage)
-    * 6.3. [Examples](#examples)
+6. [Installation](#installation)
+7. [Usage](#usage)
+9. [Feedback](#feedback)
+10. [License](#license)
 
 
 # Features
@@ -34,6 +34,7 @@ A sleek, terminal-based music player written in Rust
 * Terminal user interface - navigate with only keyboard needed
 * Playback controls. Play/Pause, go to previous/next track, seek backward/forward
 * Simple controls
+* Detailed metadata
 
 
 # Controls
@@ -46,9 +47,7 @@ A sleek, terminal-based music player written in Rust
 * `Q` -> Quit
 
 
-# Guide
-
-## Installation
+# Installation
 
 1. Clone the repository
     ```Shell
@@ -66,20 +65,9 @@ A sleek, terminal-based music player written in Rust
     ```Shell
     $ sudo cp target/release/sonido /usr/bin/
     ```
-5. Test Sonido
-    ```Shell
-    $ sonido /path/to/playlist/directory/
-    ```
 
 
-## Usage
-
-```Shell
-$ sonido [-r | --recursive] [path]
-```
-
-
-## Examples
+# Usage
 
 * Get music from current working directory
     ```Shell
