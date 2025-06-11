@@ -20,11 +20,11 @@ A sleek, terminal-based music player written in Rust
 2. [Description](#description)
 3. [Table of Contents](#table-of-contents)
 4. [Features](#features)
-5. [Shortcuts](#shortcuts)
+5. [Controls](#controls)
 6. [Guide](#guide)
-    6.1. [Installation](#installation)
-    6.2. [Usage](#usage)
-    6.3. [Examples](#examples)
+    * 6.1. [Installation](#installation)
+    * 6.2. [Usage](#usage)
+    * 6.3. [Examples](#examples)
 
 
 # Features
