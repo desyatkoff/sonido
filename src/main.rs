@@ -33,6 +33,12 @@ use crossterm::{
         LeaveAlternateScreen,
     },
 };
+use lofty::{
+    read_from_path,
+    file::AudioFile,
+    file::TaggedFileExt,
+    tag::Accessor,
+};
 use ratatui::{
     prelude::*,
     symbols::border,
@@ -63,34 +69,61 @@ struct Track {
     duration: Duration,
     metadata: Metadata,
 }
+
 #[derive(Default)]
 struct Metadata {
     title: Option<String>,
     artist: Option<String>,
     album: Option<String>,
     year: Option<String>,
+    genre: Option<String>,
+    track_number: Option<u32>,
+    bitrate: Option<u32>,
+    sample_rate: Option<u32>,
+    channels: Option<u8>,
 }
 
 impl Metadata {
     fn from_path(path: &Path) -> Self {
+        let mut metadata = Self::default();
+
         let file_name = path
             .file_stem()
             .and_then(|n| n.to_str())
             .unwrap_or("Unknown")
             .to_string();
 
-        if let Some((artist, title)) = file_name.split_once(" - ") {
-            return Self {
-                title: Some(title.to_string()),
-                artist: Some(artist.to_string()),
-                ..Default::default()
-            };
-        } else {
-            return Self {
-                title: Some(file_name),
-                ..Default::default()
-            };
+        if let Ok(tagged_file) = read_from_path(path) {
+            let tag = tagged_file
+                .primary_tag()
+                .or_else(|| tagged_file.first_tag());
+
+            if let Some(tag) = tag {
+                metadata.title = tag.title().map(|s| s.to_string());
+                metadata.artist = tag.artist().map(|s| s.to_string());
+                metadata.album = tag.album().map(|s| s.to_string());
+                metadata.year = tag.year().map(|y| y.to_string());
+                metadata.genre = tag.genre().map(|s| s.to_string());
+                metadata.track_number = tag.track();
+            }
+
+            let properties = tagged_file.properties();
+
+            metadata.bitrate = properties.audio_bitrate();
+            metadata.sample_rate = properties.sample_rate();
+            metadata.channels = properties.channels();
         }
+
+        if metadata.title.is_none() {
+            if let Some((artist, title)) = file_name.split_once(" - ") {
+                metadata.title = Some(title.to_string());
+                metadata.artist = Some(artist.to_string());
+            } else {
+                metadata.title = Some(file_name);
+            }
+        }
+
+        return metadata;
     }
 }
 
@@ -154,7 +187,7 @@ fn parse_args(args: &[String]) -> (bool, PathBuf) {
 
     for arg in args.iter().skip(1) {
         match arg.as_str() {
-            "--recursive" | "-r" => {
+            "-r" | "--recursive" => {
                 recursive = true;
             },
             _ if arg.starts_with('-') => {},
@@ -284,6 +317,7 @@ fn ui(f: &mut Frame, app: &App) {
     f.render_stateful_widget(list, center_layout[0], &mut app.list_state.clone());
 
     let metadata = &track.metadata;
+    
     let mut lines = vec![
         Line::from(vec![
             Span::styled("Title: ", Style::default().fg(Color::Blue)),
@@ -308,18 +342,59 @@ fn ui(f: &mut Frame, app: &App) {
             Span::raw(format_duration(track.duration)),
         ]),
     ];
-
+    
     if let Some(album) = &metadata.album {
         lines.push(Line::from(vec![
             Span::styled("Album: ", Style::default().fg(Color::Blue)),
             Span::raw(album),
         ]));
     }
-
+    
     if let Some(year) = &metadata.year {
         lines.push(Line::from(vec![
             Span::styled("Year: ", Style::default().fg(Color::Blue)),
             Span::raw(year),
+        ]));
+    }
+    
+    if let Some(genre) = &metadata.genre {
+        lines.push(Line::from(vec![
+            Span::styled("Genre: ", Style::default().fg(Color::Blue)),
+            Span::raw(genre),
+        ]));
+    }
+    
+    if let Some(track_num) = metadata.track_number {
+        lines.push(Line::from(vec![
+            Span::styled("Track: ", Style::default().fg(Color::Blue)),
+            Span::raw(track_num.to_string()),
+        ]));
+    }
+
+    if let Some(bitrate) = metadata.bitrate {
+        lines.push(Line::from(vec![
+            Span::styled("Bitrate: ", Style::default().fg(Color::Blue)),
+            Span::raw(format!("{} kbps", bitrate)),
+        ]));
+    }
+
+    if let Some(sample_rate) = metadata.sample_rate {
+        lines.push(Line::from(vec![
+            Span::styled("Sample Rate: ", Style::default().fg(Color::Blue)),
+            Span::raw(format!("{} Hz", sample_rate)),
+        ]));
+    }
+
+    if let Some(channels) = metadata.channels {
+        let channel_str = match channels {
+            1 => "Mono".to_string(),
+            2 => "Stereo".to_string(),
+            n => format!("{} channels", n),
+        };
+
+        lines.push(Line::from(vec![
+            Span::styled("Channels: ", Style::default().fg(Color::Blue)),
+            Span::raw(channel_str),
         ]));
     }
 
@@ -328,6 +403,7 @@ fn ui(f: &mut Frame, app: &App) {
         .border_set(border::ROUNDED)
         .border_style(Style::default().fg(Color::Blue))
         .title(" Metadata ");
+
     let metadata_widget = Paragraph::new(lines)
         .block(metadata_block)
         .wrap(Wrap { trim: true });
