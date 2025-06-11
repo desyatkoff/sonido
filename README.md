@@ -14,24 +14,41 @@
 A sleek, terminal-based music player written in Rust
 
 
+# Table of Contents
+
+1. [Sonido](#sonido)
+2. [Description](#description)
+3. [Table of Contents](#table-of-contents)
+4. [Features](#features)
+5. [Shortcuts](#shortcuts)
+6. [Guide](#guide)
+    6.1. [Installation](#installation)
+    6.2. [Usage](#usage)
+    6.3. [Examples](#examples)
+
+
 # Features
 
-* Play local audio files: `.mp3`, `.wav`, `.flac` and others
+* Play local audio files: .mp3, .wav, .flac and others
 * Lightweight & fast
 * Terminal user interface - navigate with only keyboard needed
-* Playback controls – play, pause, go to previous track, go to next track
-* Simple shortcuts
+* Playback controls. Play/Pause, go to previous/next track, seek backward/forward
+* Simple controls
 
 
-# Shortcuts
+# Controls
 
 * `Space` -> Toggle playback
+* `←` -> Seek backward
+* `→` -> Seek forward
 * `↑` -> Go to previous track
 * `↓` -> Go to next track
 * `Q` -> Quit
 
 
-# Installation
+# Guide
+
+## Installation
 
 1. Clone the repository
     ```Shell
@@ -45,7 +62,7 @@ A sleek, terminal-based music player written in Rust
     ```Shell
     $ cargo build --release
     ```
-4. Copy compiled binary to the `/usr/bin/` directory
+4. Copy compiled binary to the /usr/bin/ directory
     ```Shell
     $ sudo cp target/release/sonido /usr/bin/
     ```
@@ -53,3 +70,52 @@ A sleek, terminal-based music player written in Rust
     ```Shell
     $ sonido /path/to/playlist/directory/
     ```
+
+
+## Usage
+
+```Shell
+$ sonido [-r | --recursive] [path]
+```
+
+
+## Examples
+
+* Get music from current working directory
+    ```Shell
+    $ sonido
+    ```
+* Get music recursively from current working directory (from all subdirectories)
+    + Short
+        ```Shell
+        $ sonido -r
+        ```
+    + Full
+        ```Shell
+        $ sonido --recursive
+        ```
+* Get music from ~/Music/
+    ```Shell
+    $ sonido ~/Music/
+    ```
+* Get music recursively from ~/Music/
+    + Short
+        ```Shell
+        $ sonido -r ~/Music/
+        ```
+    + Full
+        ```Shell
+        $ sonido --recursive ~/Music/
+        ```
+
+
+# Feedback  
+
+Found a bug? [Open an issue](https://github.com/desyatkoff/sonido/issues/new)
+
+
+# License
+
+Copyright (C) 2025 Desyatkov Sergey
+
+This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with this program. If not, see <https://www.gnu.org/licenses/>
