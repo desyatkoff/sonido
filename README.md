@@ -23,8 +23,8 @@ A sleek, terminal-based music player written in Rust
 5. [Controls](#controls)
 6. [Installation](#installation)
 7. [Usage](#usage)
-9. [Feedback](#feedback)
-10. [License](#license)
+8. [Feedback](#feedback)
+9. [License](#license)
 
 
 # Features
