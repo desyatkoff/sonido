@@ -3,7 +3,7 @@ Copyright (C) 2025 Desyatkov Sergey
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+(at your option) any later version
 */
 
 use std::{
@@ -32,6 +32,12 @@ use crossterm::{
         EnterAlternateScreen,
         LeaveAlternateScreen,
     },
+};
+use lofty::{
+    read_from_path,
+    file::AudioFile,
+    file::TaggedFileExt,
+    tag::Accessor,
 };
 use ratatui::{
     prelude::*,
@@ -63,34 +69,61 @@ struct Track {
     duration: Duration,
     metadata: Metadata,
 }
+
 #[derive(Default)]
 struct Metadata {
     title: Option<String>,
     artist: Option<String>,
     album: Option<String>,
     year: Option<String>,
+    genre: Option<String>,
+    track_number: Option<u32>,
+    bitrate: Option<u32>,
+    sample_rate: Option<u32>,
+    channels: Option<u8>,
 }
 
 impl Metadata {
     fn from_path(path: &Path) -> Self {
+        let mut metadata = Self::default();
+
         let file_name = path
             .file_stem()
             .and_then(|n| n.to_str())
             .unwrap_or("Unknown")
             .to_string();
 
-        if let Some((artist, title)) = file_name.split_once(" - ") {
-            return Self {
-                title: Some(title.to_string()),
-                artist: Some(artist.to_string()),
-                ..Default::default()
-            };
-        } else {
-            return Self {
-                title: Some(file_name),
-                ..Default::default()
-            };
+        if let Ok(tagged_file) = read_from_path(path) {
+            let tag = tagged_file
+                .primary_tag()
+                .or_else(|| tagged_file.first_tag());
+
+            if let Some(tag) = tag {
+                metadata.title = tag.title().map(|s| s.to_string());
+                metadata.artist = tag.artist().map(|s| s.to_string());
+                metadata.album = tag.album().map(|s| s.to_string());
+                metadata.year = tag.year().map(|y| y.to_string());
+                metadata.genre = tag.genre().map(|s| s.to_string());
+                metadata.track_number = tag.track();
+            }
+
+            let properties = tagged_file.properties();
+
+            metadata.bitrate = properties.audio_bitrate();
+            metadata.sample_rate = properties.sample_rate();
+            metadata.channels = properties.channels();
         }
+
+        if metadata.title.is_none() {
+            if let Some((artist, title)) = file_name.split_once(" - ") {
+                metadata.title = Some(title.to_string());
+                metadata.artist = Some(artist.to_string());
+            } else {
+                metadata.title = Some(file_name);
+            }
+        }
+
+        return metadata;
     }
 }
 
@@ -113,8 +146,46 @@ enum PlaybackState {
 
 fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
-    let (recursive, music_directory) = parse_args(&args);
+    let (help, recursive, version, music_directory) = parse_args(&args);
     let tracks = scan_music_files(&music_directory, recursive)?;
+
+    if help {
+        println!(
+            r#"
+USAGE:
+    sonido [OPTIONS] [PATH]
+
+OPTIONS:
+    -h, --help       Print this help message
+    -v, --version    Print version
+            "#
+        );
+
+        return Ok(());
+    } else if version {
+        println!(
+            r#"
+ ____              _     _       
+/ ___|  ___  _ __ (_) __| | ___  
+\___ \ / _ \| '_ \| |/ _` |/ _ \ 
+ ___) | (_) | | | | | (_| | (_) |
+|____/ \___/|_| |_|_|\__,_|\___/
+
+Sonido v{}
+A sleek, terminal-based music player written in Rust
+
+Copyright (C) 2025 Desyatkov Sergey
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version
+            "#,
+            VERSION
+        );
+
+        return Ok(());
+    }
 
     if tracks.is_empty() {
         anyhow::bail!("No music files found in {}", music_directory.display());
@@ -148,15 +219,23 @@ fn main() -> Result<()> {
     return result;
 }
 
-fn parse_args(args: &[String]) -> (bool, PathBuf) {
+fn parse_args(args: &[String]) -> (bool, bool, bool, PathBuf) {
+    let mut help = false;
     let mut recursive = false;
+    let mut version = false;
     let mut music_directory = None;
 
     for arg in args.iter().skip(1) {
         match arg.as_str() {
-            "--recursive" | "-r" => {
+            "-h" | "--help" => {
+                help = true;
+            },
+            "-r" | "--recursive" => {
                 recursive = true;
             },
+            "-v" | "--version" => {
+                version = true;
+            }
             _ if arg.starts_with('-') => {},
             _ => {
                 if music_directory.is_none() {
@@ -168,7 +247,7 @@ fn parse_args(args: &[String]) -> (bool, PathBuf) {
 
     let music_directory = music_directory.unwrap_or_else(|| env::current_dir().unwrap());
 
-    return (recursive, music_directory);
+    return (help, recursive, version, music_directory);
 }
 
 fn run_app(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>, app: &mut App) -> Result<()> {
@@ -284,6 +363,7 @@ fn ui(f: &mut Frame, app: &App) {
     f.render_stateful_widget(list, center_layout[0], &mut app.list_state.clone());
 
     let metadata = &track.metadata;
+    
     let mut lines = vec![
         Line::from(vec![
             Span::styled("Title: ", Style::default().fg(Color::Blue)),
@@ -308,18 +388,59 @@ fn ui(f: &mut Frame, app: &App) {
             Span::raw(format_duration(track.duration)),
         ]),
     ];
-
+    
     if let Some(album) = &metadata.album {
         lines.push(Line::from(vec![
             Span::styled("Album: ", Style::default().fg(Color::Blue)),
             Span::raw(album),
         ]));
     }
-
+    
     if let Some(year) = &metadata.year {
         lines.push(Line::from(vec![
             Span::styled("Year: ", Style::default().fg(Color::Blue)),
             Span::raw(year),
+        ]));
+    }
+    
+    if let Some(genre) = &metadata.genre {
+        lines.push(Line::from(vec![
+            Span::styled("Genre: ", Style::default().fg(Color::Blue)),
+            Span::raw(genre),
+        ]));
+    }
+    
+    if let Some(track_num) = metadata.track_number {
+        lines.push(Line::from(vec![
+            Span::styled("Track: ", Style::default().fg(Color::Blue)),
+            Span::raw(track_num.to_string()),
+        ]));
+    }
+
+    if let Some(bitrate) = metadata.bitrate {
+        lines.push(Line::from(vec![
+            Span::styled("Bitrate: ", Style::default().fg(Color::Blue)),
+            Span::raw(format!("{} kbps", bitrate)),
+        ]));
+    }
+
+    if let Some(sample_rate) = metadata.sample_rate {
+        lines.push(Line::from(vec![
+            Span::styled("Sample Rate: ", Style::default().fg(Color::Blue)),
+            Span::raw(format!("{} Hz", sample_rate)),
+        ]));
+    }
+
+    if let Some(channels) = metadata.channels {
+        let channel_str = match channels {
+            1 => "Mono".to_string(),
+            2 => "Stereo".to_string(),
+            n => format!("{} channels", n),
+        };
+
+        lines.push(Line::from(vec![
+            Span::styled("Channels: ", Style::default().fg(Color::Blue)),
+            Span::raw(channel_str),
         ]));
     }
 
@@ -328,6 +449,7 @@ fn ui(f: &mut Frame, app: &App) {
         .border_set(border::ROUNDED)
         .border_style(Style::default().fg(Color::Blue))
         .title(" Metadata ");
+
     let metadata_widget = Paragraph::new(lines)
         .block(metadata_block)
         .wrap(Wrap { trim: true });
