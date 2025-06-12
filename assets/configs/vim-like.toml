@@ -1,0 +1,11 @@
+[config]
+toggle_playback = "space"
+seek_backward = "h"
+seek_forward = "l"
+seek_step = 5
+previous_track = "k"
+next_track = "j"
+quit = "q"
+show_metadata_panel = true
+rounded_corners = true
+accent_color = "blue"
