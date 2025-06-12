@@ -33,6 +33,7 @@ use crossterm::{
         LeaveAlternateScreen,
     },
 };
+use directories::ProjectDirs;
 use lofty::{
     read_from_path,
     file::AudioFile,
@@ -59,6 +60,10 @@ use rodio::{
     OutputStream,
     Sink,
     Source,
+};
+use serde::{
+    Deserialize,
+    Serialize,
 };
 use walkdir::WalkDir;
 
@@ -127,8 +132,45 @@ impl Metadata {
     }
 }
 
+#[derive(Debug, Deserialize, Serialize)]
+struct Config {
+    config: ConfigSettings,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+struct ConfigSettings {
+    toggle_playback: String,
+    seek_backward: String,
+    seek_forward: String,
+    seek_step: u64,
+    previous_track: String,
+    next_track: String,
+    quit: String,
+    show_metadata_panel: bool,
+    rounded_corners: bool,
+    accent_color: String,
+}
+
+impl Default for ConfigSettings {
+    fn default() -> Self {
+        ConfigSettings {
+            toggle_playback: "space".into(),
+            seek_backward: "left".into(),
+            seek_forward: "right".into(),
+            seek_step: 5,
+            previous_track: "up".into(),
+            next_track: "down".into(),
+            quit: "q".into(),
+            show_metadata_panel: true,
+            rounded_corners: true,
+            accent_color: "blue".into(),
+        }
+    }
+}
+
 struct App {
     tracks: Vec<Track>,
+    config: ConfigSettings,
     current_track: usize,
     list_state: ListState,
     playback_state: PlaybackState,
@@ -198,9 +240,11 @@ the Free Software Foundation, either version 3 of the License, or
     execute!(stdout, EnterAlternateScreen)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
+    let config = load_config();
 
     let mut app = App {
         tracks,
+        config,
         current_track: 0,
         list_state: ListState::default().with_selected(Some(0)),
         playback_state: PlaybackState::Stopped,
@@ -251,6 +295,156 @@ fn parse_args(args: &[String]) -> (bool, bool, bool, PathBuf) {
     return (help, recursive, version, music_directory);
 }
 
+fn parse_key(key_str: &str) -> KeyCode {
+    match key_str.to_lowercase().as_str() {
+        "space" => {
+            return KeyCode::Char(' ');
+        },
+        "left" => {
+            return KeyCode::Left;
+        },
+        "right" => {
+            return KeyCode::Right;
+        },
+        "up" => {
+            return KeyCode::Up;
+        },
+        "down" => {
+            return KeyCode::Down;
+        },
+        "escape" | "esc" => {
+            return KeyCode::Esc;
+        },
+        "tab" => {
+            return KeyCode::Tab;
+        },
+        "backspace" => {
+            return KeyCode::Backspace;
+        },
+        "enter" => {
+            return KeyCode::Enter;
+        },
+        "insert" | "ins" => {
+            return KeyCode::Insert;
+        },
+        "delete" | "del" => {
+            return KeyCode::Delete;
+        },
+        "home" => {
+            return KeyCode::Home;
+        },
+        "end" => {
+            return KeyCode::End;
+        },
+        "pageup" | "pgup" => {
+            return KeyCode::PageUp;
+        },
+        "pagedown" | "pgdown" => {
+            return KeyCode::PageDown;
+        },
+        key if key.len() == 1 => {
+            return KeyCode::Char(
+                key
+                    .chars()
+                    .next()
+                    .unwrap()
+            );
+        },
+        _ => {
+            return KeyCode::Null;
+        },
+    }
+}
+
+fn parse_color(color_str: &str) -> Color {
+    match color_str.to_lowercase().as_str() {
+        "black" => {
+            return Color::Black;
+        },
+        "red" => {
+            return Color::Red;
+        },
+        "green" => {
+            return Color::Green;
+        },
+        "yellow" => {
+            return Color::Yellow;
+        },
+        "blue" => {
+            return Color::Blue;
+        },
+        "magenta" => {
+            return Color::Magenta;
+        },
+        "cyan" => {
+            return Color::Cyan;
+        },
+        "gray" | "grey" => {
+            return Color::Gray;
+        },
+        "darkgray" | "darkgrey" => {
+            return Color::DarkGray;
+        },
+        "lightred" => {
+            return Color::LightRed;
+        },
+        "lightgreen" => {
+            return Color::LightGreen;
+        },
+        "lightyellow" => {
+            return Color::LightYellow;
+        },
+        "lightblue" => {
+            return Color::LightBlue;
+        },
+        "lightmagenta" => {
+            return Color::LightMagenta;
+        },
+        "lightcyan" => {
+            return Color::LightCyan;
+        },
+        "white" => {
+            return Color::White;
+        },
+        _ => {
+            return Color::Blue;
+        },
+    }
+}
+
+fn load_config() -> ConfigSettings {
+    if let Some(project_dirs) = ProjectDirs::from("", "", "sonido") {
+        let config_directory = project_dirs.config_dir();
+        let config_path = config_directory.join("config.toml");
+
+        if let Ok(contents) = std::fs::read_to_string(&config_path) {
+            match toml::from_str::<Config>(&contents) {
+                Ok(config) => {
+                    return config.config;
+                },
+                Err(e) => {
+                    return ConfigSettings::default();
+                }
+            }
+        } else {
+            let default_config = ConfigSettings::default();
+
+            std::fs::create_dir_all(config_directory);
+
+            match toml::to_string(&Config { config: default_config.clone() }) {
+                Ok(toml_str) => {
+                    std::fs::write(&config_path, toml_str);
+                },
+                Err(_) => {},
+            }
+
+            return default_config;
+        }
+    } else {
+        return ConfigSettings::default();
+    }
+}
+
 fn run_app(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>, app: &mut App) -> Result<()> {
     loop {
         terminal.draw(|f| ui(f, app))?;
@@ -259,22 +453,22 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>, app: &mut
             if let Event::Key(key) = event::read()? {
                 if key.kind == KeyEventKind::Press {
                     match key.code {
-                        KeyCode::Char('q') => {
+                        _ if key.code == parse_key(&app.config.quit) => {
                             return Ok(());
                         },
-                        KeyCode::Char(' ') => {
+                        _ if key.code == parse_key(&app.config.toggle_playback) => {
                             toggle_playback(app);
                         },
-                        KeyCode::Left => {
-                            seek(app, -5);
+                        _ if key.code == parse_key(&app.config.seek_backward) => {
+                            seek(app, -(app.config.seek_step as i64));
                         },
-                        KeyCode::Right => {
-                            seek(app, 5);
+                        _ if key.code == parse_key(&app.config.seek_forward) => {
+                            seek(app, app.config.seek_step as i64);
                         },
-                        KeyCode::Up => {
+                        _ if key.code == parse_key(&app.config.previous_track) => {
                             next_track(app, -1);
                         },
-                        KeyCode::Down => {
+                        _ if key.code == parse_key(&app.config.next_track) => {
                             next_track(app, 1);
                         },
                         _ => {},
@@ -294,6 +488,16 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>, app: &mut
 }
 
 fn ui(f: &mut Frame, app: &App) {
+    let show_metadata_panel = app.config.show_metadata_panel;
+    let rounded_corners = app.config.rounded_corners;
+    let accent_color = parse_color(&app.config.accent_color);
+
+    let border_set = if app.config.rounded_corners {
+        border::ROUNDED
+    } else {
+        border::PLAIN
+    };
+
     let layout = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -303,20 +507,27 @@ fn ui(f: &mut Frame, app: &App) {
         ])
         .split(f.area());
 
-    let center_layout = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Percentage(50),
-            Constraint::Percentage(50),
-        ])
-        .split(layout[1]);
+    let center_layout = if show_metadata_panel {
+        Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Percentage(50),
+                Constraint::Percentage(50),
+            ])
+            .split(layout[1])
+    } else {
+        Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(100)])
+            .split(layout[1])
+    };
 
     let track = &app.tracks[app.current_track];
 
     let title = Block::default()
         .borders(Borders::ALL)
-        .border_set(border::ROUNDED)
-        .border_style(Style::default().fg(Color::Blue))
+        .border_set(border_set)
+        .border_style(Style::default().fg(accent_color))
         .title(format!(" Sonido v{} ", VERSION))
         .title_alignment(Alignment::Center);
 
@@ -342,9 +553,9 @@ fn ui(f: &mut Frame, app: &App) {
                 });
             
             let style = if i == app.current_track {
-                Style::default().fg(Color::Blue)
+                Style::default().fg(accent_color)
             } else {
-                Style::default().fg(Color::White)
+                Style::default()
             };
             
             return ListItem::new(display_name).style(style);
@@ -355,8 +566,8 @@ fn ui(f: &mut Frame, app: &App) {
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .border_set(border::ROUNDED)
-                .border_style(Style::default().fg(Color::Blue))
+                .border_set(border_set)
+                .border_style(Style::default().fg(accent_color))
                 .title(" Playlist "),
         )
         .highlight_style(Style::default().bold());
@@ -367,7 +578,7 @@ fn ui(f: &mut Frame, app: &App) {
     
     let mut lines = vec![
         Line::from(vec![
-            Span::styled("Title: ", Style::default().fg(Color::Blue)),
+            Span::styled("Title: ", Style::default().fg(accent_color)),
             Span::raw(
                 metadata
                     .title
@@ -376,7 +587,7 @@ fn ui(f: &mut Frame, app: &App) {
             ),
         ]),
         Line::from(vec![
-            Span::styled("Artist: ", Style::default().fg(Color::Blue)),
+            Span::styled("Artist: ", Style::default().fg(accent_color)),
             Span::raw(
                 metadata
                     .artist
@@ -385,49 +596,49 @@ fn ui(f: &mut Frame, app: &App) {
             ),
         ]),
         Line::from(vec![
-            Span::styled("Duration: ", Style::default().fg(Color::Blue)),
+            Span::styled("Duration: ", Style::default().fg(accent_color)),
             Span::raw(format_duration(track.duration)),
         ]),
     ];
     
     if let Some(album) = &metadata.album {
         lines.push(Line::from(vec![
-            Span::styled("Album: ", Style::default().fg(Color::Blue)),
+            Span::styled("Album: ", Style::default().fg(accent_color)),
             Span::raw(album),
         ]));
     }
     
     if let Some(year) = &metadata.year {
         lines.push(Line::from(vec![
-            Span::styled("Year: ", Style::default().fg(Color::Blue)),
+            Span::styled("Year: ", Style::default().fg(accent_color)),
             Span::raw(year),
         ]));
     }
     
     if let Some(genre) = &metadata.genre {
         lines.push(Line::from(vec![
-            Span::styled("Genre: ", Style::default().fg(Color::Blue)),
+            Span::styled("Genre: ", Style::default().fg(accent_color)),
             Span::raw(genre),
         ]));
     }
     
     if let Some(track_num) = metadata.track_number {
         lines.push(Line::from(vec![
-            Span::styled("Track: ", Style::default().fg(Color::Blue)),
+            Span::styled("Track: ", Style::default().fg(accent_color)),
             Span::raw(track_num.to_string()),
         ]));
     }
 
     if let Some(bitrate) = metadata.bitrate {
         lines.push(Line::from(vec![
-            Span::styled("Bitrate: ", Style::default().fg(Color::Blue)),
+            Span::styled("Bitrate: ", Style::default().fg(accent_color)),
             Span::raw(format!("{} kbps", bitrate)),
         ]));
     }
 
     if let Some(sample_rate) = metadata.sample_rate {
         lines.push(Line::from(vec![
-            Span::styled("Sample Rate: ", Style::default().fg(Color::Blue)),
+            Span::styled("Sample Rate: ", Style::default().fg(accent_color)),
             Span::raw(format!("{} Hz", sample_rate)),
         ]));
     }
@@ -440,22 +651,24 @@ fn ui(f: &mut Frame, app: &App) {
         };
 
         lines.push(Line::from(vec![
-            Span::styled("Channels: ", Style::default().fg(Color::Blue)),
+            Span::styled("Channels: ", Style::default().fg(accent_color)),
             Span::raw(channel_str),
         ]));
     }
 
     let metadata_block = Block::default()
         .borders(Borders::ALL)
-        .border_set(border::ROUNDED)
-        .border_style(Style::default().fg(Color::Blue))
+        .border_set(border_set)
+        .border_style(Style::default().fg(accent_color))
         .title(" Metadata ");
 
     let metadata_widget = Paragraph::new(lines)
         .block(metadata_block)
         .wrap(Wrap { trim: true });
 
-    f.render_widget(metadata_widget, center_layout[1]);
+    if show_metadata_panel {
+        f.render_widget(metadata_widget, center_layout[1]);
+    }
 
     let progress = app.position.as_secs_f64() / track.duration.as_secs_f64();
     let progress_text = format!(
@@ -467,10 +680,10 @@ fn ui(f: &mut Frame, app: &App) {
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .border_set(border::ROUNDED)
-                .border_style(Style::default().fg(Color::Blue)),
+                .border_set(border_set)
+                .border_style(Style::default().fg(accent_color)),
         )
-        .gauge_style(Style::default().fg(Color::Blue))
+        .gauge_style(Style::default().fg(accent_color))
         .ratio(progress)
         .label(progress_text)
         .use_unicode(true);
