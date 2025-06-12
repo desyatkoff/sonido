@@ -9,12 +9,12 @@
 ```
 
 
-# Description
+## Description
 
 A sleek, terminal-based music player written in Rust
 
 
-# Table of Contents
+## Table of Contents
 
 1. [Sonido](#sonido)
 2. [Description](#description)
@@ -28,7 +28,7 @@ A sleek, terminal-based music player written in Rust
 10. [License](#license)
 
 
-# Features
+## Features
 
 * Play local audio files
 * Lightweight & fast
@@ -38,7 +38,7 @@ A sleek, terminal-based music player written in Rust
 * Highly customizable
 
 
-# Controls
+## Controls
 
 By default, the controls are:
 
@@ -52,7 +52,7 @@ By default, the controls are:
 But you can set everything as you want. The config file is located at `~/.config/sonido/config.toml`, it should be automatically created on first start (if not, then just copy the [default config](assets/configs/default.toml))
 
 
-# Installation
+## Installation
 
 1. Clone the repository
     ```Shell
@@ -72,7 +72,7 @@ But you can set everything as you want. The config file is located at `~/.config
     ```
 
 
-# Usage
+## Usage
 
 * Get music from current working directory
     ```Shell
@@ -102,7 +102,7 @@ But you can set everything as you want. The config file is located at `~/.config
         ```
 
 
-# Configuration
+## Configuration
 
 The config file will automatically created on first start and will contain this settings:
 
@@ -125,12 +125,12 @@ After editing it, you should restart Sonido to apply changes. Everything is simp
 Config presets you can find [here](assets/configs/) or simply make your own one
 
 
-# Feedback  
+## Feedback  
 
 Found a bug? [Open an issue](https://github.com/desyatkoff/sonido/issues/new)
 
 
-# License
+## License
 
 Copyright (C) 2025 Desyatkov Sergey
 
