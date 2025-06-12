@@ -23,28 +23,33 @@ A sleek, terminal-based music player written in Rust
 5. [Controls](#controls)
 6. [Installation](#installation)
 7. [Usage](#usage)
-8. [Feedback](#feedback)
-9. [License](#license)
+8. [Configuration](#configuration)
+9. [Feedback](#feedback)
+10. [License](#license)
 
 
 # Features
 
-* Play local audio files: .mp3, .wav, .flac and others
+* Play local audio files
 * Lightweight & fast
-* Terminal user interface - navigate with only keyboard needed
-* Playback controls. Play/Pause, go to previous/next track, seek backward/forward
+* Navigate with only keyboard needed
 * Simple controls
 * Detailed metadata
+* Highly customizable
 
 
 # Controls
 
+By default, the controls are:
+
 * `Space` -> Toggle playback
-* `←` -> Seek backward
-* `→` -> Seek forward
+* `←` -> Seek backward (-5s)
+* `→` -> Seek forward (+5s)
 * `↑` -> Go to previous track
 * `↓` -> Go to next track
 * `Q` -> Quit
+
+But you can set everything as you want. The config file is located at `~/.config/sonido/config.toml`, it should be automatically created on first start (if not, then just copy the [default config](assets/configs/default.toml))
 
 
 # Installation
@@ -61,7 +66,7 @@ A sleek, terminal-based music player written in Rust
     ```Shell
     $ cargo build --release
     ```
-4. Copy compiled binary to the /usr/bin/ directory
+4. Copy compiled binary to the `/usr/bin/` directory
     ```Shell
     $ sudo cp target/release/sonido /usr/bin/
     ```
@@ -82,11 +87,11 @@ A sleek, terminal-based music player written in Rust
         ```Shell
         $ sonido --recursive
         ```
-* Get music from ~/Music/
+* Get music from `~/Music/`
     ```Shell
     $ sonido ~/Music/
     ```
-* Get music recursively from ~/Music/
+* Get music recursively from `~/Music/`
     + Short
         ```Shell
         $ sonido -r ~/Music/
@@ -95,6 +100,29 @@ A sleek, terminal-based music player written in Rust
         ```Shell
         $ sonido --recursive ~/Music/
         ```
+
+
+# Configuration
+
+The config file will automatically created on first start and will contain this settings:
+
+```TOML
+[config]
+toggle_playback = "space"
+seek_backward = "left"
+seek_forward = "right"
+seek_step = 5
+previous_track = "up"
+next_track = "down"
+quit = "q"
+show_metadata_panel = true
+rounded_corners = true
+accent_color = "blue"
+```
+
+After editing it, you should restart Sonido to apply changes. Everything is simple and intuitive, so it's not necessary to write a whole guide on it
+
+Config presets you can find [here](assets/configs/) or simply make your own one
 
 
 # Feedback  
