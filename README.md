@@ -49,7 +49,7 @@ By default, the controls are:
 * `↓` -> Go to next track
 * `Q` -> Quit
 
-But you can set everything as you want. The config file is located at `~/.config/sonido/config.toml`, it should be automatically created on first start (if not, then just copy the [default config](assets/configs/default.toml))
+But you can set everything as you want. The config file is located at `~/.config/sonido/config.toml`, it will be created on first launch. If it doesn't show up, you can manually copy the [default config](assets/configs/default.toml))
 
 
 ## Installation
@@ -104,7 +104,7 @@ But you can set everything as you want. The config file is located at `~/.config
 
 ## Configuration
 
-The config file will automatically created on first start and will contain this settings:
+The config file will automatically created on first launch and will contain these settings:
 
 ```TOML
 [config]
@@ -115,12 +115,20 @@ seek_step = 5
 previous_track = "up"
 next_track = "down"
 quit = "q"
+show_app_title = true
+show_playlist_title = true
+show_metadata_title = true
 show_metadata_panel = true
+show_progress_title = false
+app_title_alignment = "center"
+playlist_title_alignment = "left"
+metadata_title_alignment = "left"
+progress_title_alignment = "left"
 rounded_corners = true
 accent_color = "blue"
 ```
 
-After editing it, you should restart Sonido to apply changes. Everything is simple and intuitive, so it's not necessary to write a whole guide on it
+Restart Sonido after editing to apply changes. Everything is simple and intuitive, so it's not necessary to write a whole guide on it
 
 Config presets you can find [here](assets/configs/) or simply make your own one
 
