@@ -146,7 +146,15 @@ struct ConfigSettings {
     previous_track: String,
     next_track: String,
     quit: String,
+    show_app_title: bool,
+    show_playlist_title: bool,
+    show_metadata_title: bool,
     show_metadata_panel: bool,
+    show_progress_title: bool,
+    app_title_alignment: String,
+    playlist_title_alignment: String,
+    metadata_title_alignment: String,
+    progress_title_alignment: String,
     rounded_corners: bool,
     accent_color: String,
 }
@@ -161,7 +169,15 @@ impl Default for ConfigSettings {
             previous_track: "up".into(),
             next_track: "down".into(),
             quit: "q".into(),
+            show_app_title: true,
+            show_playlist_title: true,
+            show_metadata_title: true,
             show_metadata_panel: true,
+            show_progress_title: false,
+            app_title_alignment: "center".into(),
+            playlist_title_alignment: "left".into(),
+            metadata_title_alignment: "left".into(),
+            progress_title_alignment: "left".into(),
             rounded_corners: true,
             accent_color: "blue".into(),
         }
@@ -218,7 +234,6 @@ Sonido v{}
 A sleek, terminal-based music player written in Rust
 
 Copyright (C) 2025 Desyatkov Sergey
-
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
@@ -356,6 +371,23 @@ fn parse_key(key_str: &str) -> KeyCode {
     }
 }
 
+fn parse_alignment(alignment_str: &str) -> Alignment {
+    match alignment_str.to_lowercase().as_str() {
+        "left" => {
+            return Alignment::Left;
+        },
+        "center" => {
+            return Alignment::Center;
+        },
+        "right" => {
+            return Alignment::Right;
+        },
+        _ => {
+            return Alignment::Left;
+        }
+    }
+}
+
 fn parse_color(color_str: &str) -> Color {
     match color_str.to_lowercase().as_str() {
         "black" => {
@@ -488,7 +520,15 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>, app: &mut
 }
 
 fn ui(f: &mut Frame, app: &App) {
+    let show_app_title = app.config.show_app_title;
+    let show_playlist_title = app.config.show_playlist_title;
+    let show_metadata_title = app.config.show_metadata_title;
     let show_metadata_panel = app.config.show_metadata_panel;
+    let show_progress_title = app.config.show_progress_title;
+    let app_title_alignment = parse_alignment(&app.config.app_title_alignment);
+    let playlist_title_alignment = parse_alignment(&app.config.playlist_title_alignment);
+    let metadata_title_alignment = parse_alignment(&app.config.metadata_title_alignment);
+    let progress_title_alignment = parse_alignment(&app.config.progress_title_alignment);
     let rounded_corners = app.config.rounded_corners;
     let accent_color = parse_color(&app.config.accent_color);
 
@@ -501,7 +541,7 @@ fn ui(f: &mut Frame, app: &App) {
     let layout = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3),
+            Constraint::Length(show_app_title.into()),
             Constraint::Min(1),
             Constraint::Length(3),
         ])
@@ -525,11 +565,11 @@ fn ui(f: &mut Frame, app: &App) {
     let track = &app.tracks[app.current_track];
 
     let title = Block::default()
-        .borders(Borders::ALL)
+        .borders(Borders::TOP)
         .border_set(border_set)
         .border_style(Style::default().fg(accent_color))
         .title(format!(" Sonido v{} ", VERSION))
-        .title_alignment(Alignment::Center);
+        .title_alignment(app_title_alignment);
 
     f.render_widget(title, layout[0]);
 
@@ -562,15 +602,27 @@ fn ui(f: &mut Frame, app: &App) {
         })
         .collect();
 
-    let list = List::new(items)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .border_set(border_set)
-                .border_style(Style::default().fg(accent_color))
-                .title(" Playlist "),
-        )
-        .highlight_style(Style::default().bold());
+    let list = if show_playlist_title {
+        List::new(items)
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_set(border_set)
+                    .border_style(Style::default().fg(accent_color))
+                    .title(" Playlist ")
+                    .title_alignment(playlist_title_alignment),
+            )
+            .highlight_style(Style::default().bold())
+    } else {
+        List::new(items)
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_set(border_set)
+                    .border_style(Style::default().fg(accent_color))
+            )
+            .highlight_style(Style::default().bold())
+    };
 
     f.render_stateful_widget(list, center_layout[0], &mut app.list_state.clone());
 
@@ -656,11 +708,19 @@ fn ui(f: &mut Frame, app: &App) {
         ]));
     }
 
-    let metadata_block = Block::default()
-        .borders(Borders::ALL)
-        .border_set(border_set)
-        .border_style(Style::default().fg(accent_color))
-        .title(" Metadata ");
+    let metadata_block = if show_metadata_title {
+        Block::default()
+            .borders(Borders::ALL)
+            .border_set(border_set)
+            .border_style(Style::default().fg(accent_color))
+            .title(" Metadata ")
+            .title_alignment(metadata_title_alignment)
+    } else {
+        Block::default()
+            .borders(Borders::ALL)
+            .border_set(border_set)
+            .border_style(Style::default().fg(accent_color))
+    };
 
     let metadata_widget = Paragraph::new(lines)
         .block(metadata_block)
@@ -676,17 +736,33 @@ fn ui(f: &mut Frame, app: &App) {
         format_duration(app.position),
         format_duration(track.duration)
     );
-    let progress_gauge = Gauge::default()
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .border_set(border_set)
-                .border_style(Style::default().fg(accent_color)),
-        )
-        .gauge_style(Style::default().fg(accent_color))
-        .ratio(progress)
-        .label(progress_text)
-        .use_unicode(true);
+    let progress_gauge = if show_progress_title {
+        Gauge::default()
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_set(border_set)
+                    .border_style(Style::default().fg(accent_color))
+                    .title(" Progress ")
+                    .title_alignment(progress_title_alignment),
+            )
+            .gauge_style(Style::default().fg(accent_color))
+            .ratio(progress)
+            .label(progress_text)
+            .use_unicode(true)
+    } else {
+        Gauge::default()
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_set(border_set)
+                    .border_style(Style::default().fg(accent_color)),
+            )
+            .gauge_style(Style::default().fg(accent_color))
+            .ratio(progress)
+            .label(progress_text)
+            .use_unicode(true)
+    };
 
     f.render_widget(progress_gauge, layout[2]);
 }
