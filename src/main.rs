@@ -151,6 +151,10 @@ struct ConfigSettings {
     show_metadata_title: bool,
     show_metadata_panel: bool,
     show_progress_title: bool,
+    app_title_format: String,
+    playlist_title_format: String,
+    metadata_title_format: String,
+    progress_title_format: String,
     app_title_alignment: String,
     playlist_title_alignment: String,
     metadata_title_alignment: String,
@@ -174,6 +178,10 @@ impl Default for ConfigSettings {
             show_metadata_title: true,
             show_metadata_panel: true,
             show_progress_title: false,
+            app_title_format: "┤ Sonido v{VERSION} ├".into(),
+            playlist_title_format: "┤ Playlist ├".into(),
+            metadata_title_format: "┤ Metadata ├".into(),
+            progress_title_format: "┤ Progress ├".into(),
             app_title_alignment: "center".into(),
             playlist_title_alignment: "left".into(),
             metadata_title_alignment: "left".into(),
@@ -216,7 +224,7 @@ USAGE:
 OPTIONS:
     -h, --help       Print this help message
     -r, --recursive  Get music files from all subdirectories
-    -v, --version    Print version
+    -V, --version    Print version
             "#
         );
 
@@ -293,7 +301,7 @@ fn parse_args(args: &[String]) -> (bool, bool, bool, PathBuf) {
             "-r" | "--recursive" => {
                 recursive = true;
             },
-            "-v" | "--version" => {
+            "-V" | "--version" => {
                 version = true;
             }
             _ if arg.starts_with('-') => {},
@@ -525,11 +533,19 @@ fn ui(f: &mut Frame, app: &App) {
     let show_metadata_title = app.config.show_metadata_title;
     let show_metadata_panel = app.config.show_metadata_panel;
     let show_progress_title = app.config.show_progress_title;
+
+    let app_title_format = app.config.app_title_format.clone().replace("{VERSION}", VERSION);
+    let playlist_title_format = app.config.playlist_title_format.clone();
+    let metadata_title_format = app.config.metadata_title_format.clone();
+    let progress_title_format = app.config.progress_title_format.clone();
+
     let app_title_alignment = parse_alignment(&app.config.app_title_alignment);
     let playlist_title_alignment = parse_alignment(&app.config.playlist_title_alignment);
     let metadata_title_alignment = parse_alignment(&app.config.metadata_title_alignment);
     let progress_title_alignment = parse_alignment(&app.config.progress_title_alignment);
+
     let rounded_corners = app.config.rounded_corners;
+
     let accent_color = parse_color(&app.config.accent_color);
 
     let border_set = if app.config.rounded_corners {
@@ -568,7 +584,7 @@ fn ui(f: &mut Frame, app: &App) {
         .borders(Borders::TOP)
         .border_set(border_set)
         .border_style(Style::default().fg(accent_color))
-        .title(format!(" Sonido v{} ", VERSION))
+        .title(app_title_format)
         .title_alignment(app_title_alignment);
 
     f.render_widget(title, layout[0]);
@@ -609,7 +625,7 @@ fn ui(f: &mut Frame, app: &App) {
                     .borders(Borders::ALL)
                     .border_set(border_set)
                     .border_style(Style::default().fg(accent_color))
-                    .title(" Playlist ")
+                    .title(playlist_title_format)
                     .title_alignment(playlist_title_alignment),
             )
             .highlight_style(Style::default().bold())
@@ -713,7 +729,7 @@ fn ui(f: &mut Frame, app: &App) {
             .borders(Borders::ALL)
             .border_set(border_set)
             .border_style(Style::default().fg(accent_color))
-            .title(" Metadata ")
+            .title(metadata_title_format)
             .title_alignment(metadata_title_alignment)
     } else {
         Block::default()
@@ -743,7 +759,7 @@ fn ui(f: &mut Frame, app: &App) {
                     .borders(Borders::ALL)
                     .border_set(border_set)
                     .border_style(Style::default().fg(accent_color))
-                    .title(" Progress ")
+                    .title(progress_title_format)
                     .title_alignment(progress_title_alignment),
             )
             .gauge_style(Style::default().fg(accent_color))
