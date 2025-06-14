@@ -1,0 +1,23 @@
+[config]
+toggle_playback = "space"
+seek_backward = "left"
+seek_forward = "right"
+seek_step = 5
+previous_track = "up"
+next_track = "down"
+quit = "q"
+show_app_title = true
+show_playlist_title = true
+show_metadata_title = true
+show_metadata_panel = true
+show_progress_title = true
+app_title_format = "[ Sonido v{VERSION} ]"
+playlist_title_format = "[ Playlist ]"
+metadata_title_format = "[ Metadata ]"
+progress_title_format = "[ Progress ]"
+app_title_alignment = "right"
+playlist_title_alignment = "center"
+metadata_title_alignment = "center"
+progress_title_alignment = "left"
+rounded_corners = false
+accent_color = "cyan"
