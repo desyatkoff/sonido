@@ -22,8 +22,8 @@ A sleek, terminal-based music player written in Rust
 4. [Features](#features)
 5. [Controls](#controls)
 6. [Installation](#installation)
-7. [Usage](#usage)
-8. [Configuration](#configuration)
+7. [Configuration](#configuration)
+8. [Usage](#usage)
 9. [Feedback](#feedback)
 10. [License](#license)
 
@@ -72,8 +72,52 @@ But you can set everything as you want. The config file is located at `~/.config
     ```
 
 
+## Configuration
+
+The config file will automatically created on first launch and will contain these settings:
+
+```TOML
+[config]
+toggle_playback = "space"
+seek_backward = "left"
+seek_forward = "right"
+seek_step = 5
+previous_track = "up"
+next_track = "down"
+quit = "q"
+show_app_title = true
+show_playlist_title = true
+show_metadata_title = true
+show_metadata_panel = true
+show_progress_title = false
+app_title_format = "┤ Sonido v{VERSION} ├"
+playlist_title_format = "┤ Playlist ├"
+metadata_title_format = "┤ Metadata ├"
+progress_title_format = "┤ Progress ├"
+app_title_alignment = "center"
+playlist_title_alignment = "left"
+metadata_title_alignment = "left"
+progress_title_alignment = "left"
+rounded_corners = true
+accent_color = "blue"
+```
+
+Note that in the `app_title_format` setting, the placeholder `{VERSION}` will be replaced with current app version installed. Restart Sonido after editing to apply changes. Everything is simple and intuitive, so it's not necessary to write a whole guide on it
+
+Config presets you can find [here](assets/configs/) or simply make your own one
+
+
 ## Usage
 
+* Get help
+    + Short
+        ```Shell
+        $ sonido -h
+        ```
+    + Full
+        ```Shell
+        $ sonido --help
+        ```
 * Get music from current working directory
     ```Shell
     $ sonido
@@ -100,37 +144,15 @@ But you can set everything as you want. The config file is located at `~/.config
         ```Shell
         $ sonido --recursive ~/Music/
         ```
-
-
-## Configuration
-
-The config file will automatically created on first launch and will contain these settings:
-
-```TOML
-[config]
-toggle_playback = "space"
-seek_backward = "left"
-seek_forward = "right"
-seek_step = 5
-previous_track = "up"
-next_track = "down"
-quit = "q"
-show_app_title = true
-show_playlist_title = true
-show_metadata_title = true
-show_metadata_panel = true
-show_progress_title = false
-app_title_alignment = "center"
-playlist_title_alignment = "left"
-metadata_title_alignment = "left"
-progress_title_alignment = "left"
-rounded_corners = true
-accent_color = "blue"
-```
-
-Restart Sonido after editing to apply changes. Everything is simple and intuitive, so it's not necessary to write a whole guide on it
-
-Config presets you can find [here](assets/configs/) or simply make your own one
+* Get version
+    + Short
+        ```Shell
+        $ sonido -V
+        ```
+    + Full
+        ```Shell
+        $ sonido --version
+        ```
 
 
 ## Feedback  
