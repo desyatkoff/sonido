@@ -145,6 +145,8 @@ struct ConfigSettings {
     seek_step: u64,
     previous_track: String,
     next_track: String,
+    remove_track: String,
+    reload_config: String,
     quit: String,
     show_app_title: bool,
     show_playlist_title: bool,
@@ -172,6 +174,8 @@ impl Default for ConfigSettings {
             seek_step: 5,
             previous_track: "up".into(),
             next_track: "down".into(),
+            remove_track: "r".into(),
+            reload_config: "c".into(),
             quit: "q".into(),
             show_app_title: true,
             show_playlist_title: true,
@@ -510,6 +514,12 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>, app: &mut
                         },
                         _ if key.code == parse_key(&app.config.next_track) => {
                             next_track(app, 1);
+                        },
+                        _ if key.code == parse_key(&app.config.remove_track) => {
+                            remove_track(app, app.current_track);
+                        },
+                        _ if key.code == parse_key(&app.config.reload_config) => {
+                            app.config = load_config();
                         },
                         _ => {},
                     }
@@ -918,4 +928,10 @@ fn next_track(app: &mut App, direction: i32) {
     if !matches!(app.playback_state, PlaybackState::Stopped) {
         play_track(app);
     }
+}
+
+fn remove_track(app: &mut App, index: usize) {
+    app.tracks.remove(index);
+
+    next_track(app, 0);
 }
