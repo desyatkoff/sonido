@@ -41,6 +41,8 @@ By default, the controls are:
 * `→` -> Seek forward (+5s)
 * `↑` -> Go to previous track
 * `↓` -> Go to next track
+* `R` -> Remove current track from playlist
+* `C` -> Reload config
 * `Q` -> Quit
 
 But you can set everything as you want. The config file is located at `~/.config/sonido/config.toml`, it will be created on first launch. If it doesn't show up, you can manually copy the [default config](assets/configs/default.toml))
@@ -78,6 +80,8 @@ seek_forward = "right"
 seek_step = 5
 previous_track = "up"
 next_track = "down"
+remove_track = "r"
+reload_config = "c"
 quit = "q"
 show_app_title = true
 show_playlist_title = true
@@ -96,7 +100,7 @@ rounded_corners = true
 accent_color = "blue"
 ```
 
-Note that in the `app_title_format` setting, the placeholder `{VERSION}` will be replaced with current app version installed. Restart Sonido after editing to apply changes. Everything is simple and intuitive, so it's not necessary to write a whole guide on it
+Note that in the `app_title_format` setting, the placeholder `{VERSION}` will be replaced with current app version installed. Press `reload_config` key or restart Sonido after editing to apply changes. Everything is simple and intuitive, so it's not necessary to write a whole guide on it
 
 Config presets you can find [here](assets/configs/) or simply make your own one
 
