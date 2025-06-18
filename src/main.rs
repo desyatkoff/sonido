@@ -140,12 +140,13 @@ struct Config {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 struct ConfigSettings {
     toggle_playback: String,
+    toggle_repeat: String,
     seek_backward: String,
     seek_forward: String,
     seek_step: u64,
     previous_track: String,
     next_track: String,
-    remove_track: String,
+    hide_track: String,
     reload_config: String,
     quit: String,
     show_app_title: bool,
@@ -169,12 +170,13 @@ impl Default for ConfigSettings {
     fn default() -> Self {
         ConfigSettings {
             toggle_playback: "space".into(),
+            toggle_repeat: "r".into(),
             seek_backward: "left".into(),
             seek_forward: "right".into(),
             seek_step: 5,
             previous_track: "up".into(),
             next_track: "down".into(),
-            remove_track: "r".into(),
+            hide_track: "h".into(),
             reload_config: "c".into(),
             quit: "q".into(),
             show_app_title: true,
@@ -204,6 +206,7 @@ struct App {
     playback_state: PlaybackState,
     position: Duration,
     playback_start: Option<Instant>,
+    repeat_mode: bool,
     sink: Option<Sink>,
     _stream: Option<OutputStream>,
 }
@@ -277,6 +280,7 @@ the Free Software Foundation, either version 3 of the License, or
         playback_state: PlaybackState::Stopped,
         position: Duration::ZERO,
         playback_start: None,
+        repeat_mode: false,
         sink: None,
         _stream: None,
     };
@@ -503,6 +507,9 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>, app: &mut
                         _ if key.code == parse_key(&app.config.toggle_playback) => {
                             toggle_playback(app);
                         },
+                        _ if key.code == parse_key(&app.config.toggle_repeat) => {
+                            toggle_repeat(app);
+                        },
                         _ if key.code == parse_key(&app.config.seek_backward) => {
                             seek(app, -(app.config.seek_step as i64));
                         },
@@ -515,8 +522,8 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>, app: &mut
                         _ if key.code == parse_key(&app.config.next_track) => {
                             next_track(app, 1);
                         },
-                        _ if key.code == parse_key(&app.config.remove_track) => {
-                            remove_track(app, app.current_track);
+                        _ if key.code == parse_key(&app.config.hide_track) => {
+                            hide_track(app, app.current_track);
                         },
                         _ if key.code == parse_key(&app.config.reload_config) => {
                             app.config = load_config();
@@ -531,7 +538,7 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>, app: &mut
             app.position = start_time.elapsed();
 
             if app.position >= app.tracks[app.current_track].duration {
-                next_track(app, 1);
+                next_track(app, !app.repeat_mode as i32);
             }
         }
     }
@@ -558,7 +565,7 @@ fn ui(f: &mut Frame, app: &App) {
 
     let accent_color = parse_color(&app.config.accent_color);
 
-    let border_set = if app.config.rounded_corners {
+    let border_set = if rounded_corners {
         border::ROUNDED
     } else {
         border::PLAIN
@@ -846,7 +853,11 @@ fn get_audio_duration(path: &Path) -> Result<Duration> {
 }
 
 fn format_duration(d: Duration) -> String {
-    return format!("{}:{:02}", d.as_secs() / 60, d.as_secs() % 60);
+    return format!(
+        "{}:{:02}",
+        d.as_secs() / 60,
+        d.as_secs() % 60
+    );
 }
 
 fn toggle_playback(app: &mut App) {
@@ -871,6 +882,14 @@ fn toggle_playback(app: &mut App) {
             app.playback_start = Some(Instant::now() - app.position);
         }
     }
+}
+
+fn toggle_repeat(app: &mut App) {
+    app.repeat_mode = if app.repeat_mode {
+        false
+    } else {
+        true
+    };
 }
 
 fn seek(app: &mut App, seconds: i64) {
@@ -930,7 +949,7 @@ fn next_track(app: &mut App, direction: i32) {
     }
 }
 
-fn remove_track(app: &mut App, index: usize) {
+fn hide_track(app: &mut App, index: usize) {
     app.tracks.remove(index);
 
     next_track(app, 0);

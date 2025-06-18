@@ -1,11 +1,12 @@
 [config]
 toggle_playback = "space"
+toggle_repeat = "r"
 seek_backward = "left"
 seek_forward = "right"
 seek_step = 5
 previous_track = "up"
 next_track = "down"
-remove_track = "r"
+hide_track = "h"
 reload_config = "c"
 quit = "q"
 show_app_title = true

@@ -37,11 +37,12 @@ A sleek, terminal-based music player written in Rust
 By default, the controls are:
 
 * `Space` -> Toggle playback
+* `R` -> Toggle repeat
 * `←` -> Seek backward (-5s)
 * `→` -> Seek forward (+5s)
 * `↑` -> Go to previous track
 * `↓` -> Go to next track
-* `R` -> Remove current track from playlist
+* `H` -> Hide current track from playlist
 * `C` -> Reload config
 * `Q` -> Quit
 
@@ -64,7 +65,7 @@ But you can set everything as you want. The config file is located at `~/.config
     ```
 4. Copy compiled binary to the `/usr/bin/` directory
     ```Shell
-    $ sudo cp target/release/sonido /usr/bin/
+    $ sudo cp ./target/release/sonido /usr/bin/
     ```
 
 
@@ -75,12 +76,13 @@ The config file will automatically created on first launch and will contain thes
 ```TOML
 [config]
 toggle_playback = "space"
+toggle_repeat = "r"
 seek_backward = "left"
 seek_forward = "right"
 seek_step = 5
 previous_track = "up"
 next_track = "down"
-remove_track = "r"
+hide_track = "h"
 reload_config = "c"
 quit = "q"
 show_app_title = true
