@@ -24,6 +24,7 @@ use crossterm::{
         Event,
         KeyCode,
         KeyEventKind,
+        KeyModifiers,
     },
     execute,
     terminal::{
@@ -51,6 +52,9 @@ use ratatui::{
         ListItem,
         ListState,
         Paragraph,
+        Scrollbar,
+        ScrollbarOrientation,
+        ScrollbarState,
         Wrap,
     },
     Frame,
@@ -209,6 +213,7 @@ struct App {
     repeat_mode: bool,
     sink: Option<Sink>,
     _stream: Option<OutputStream>,
+    scroll_state: ScrollbarState,
 }
 
 enum PlaybackState {
@@ -271,6 +276,7 @@ the Free Software Foundation, either version 3 of the License, or
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
     let config = load_config();
+    let tracks_count = tracks.len();
 
     let mut app = App {
         tracks,
@@ -283,6 +289,7 @@ the Free Software Foundation, either version 3 of the License, or
         repeat_mode: false,
         sink: None,
         _stream: None,
+        scroll_state: ScrollbarState::new(tracks_count),
     };
 
     let result = run_app(&mut terminal, &mut app);
@@ -565,6 +572,12 @@ fn ui(f: &mut Frame, app: &App) {
 
     let accent_color = parse_color(&app.config.accent_color);
 
+    let mut list_state = app.list_state.clone();
+    let track = &app.tracks[app.current_track];
+    list_state.select(Some(app.current_track));
+
+    let mut scrollbar_state = ScrollbarState::new(app.tracks.len()).position(app.current_track);
+
     let border_set = if rounded_corners {
         border::ROUNDED
     } else {
@@ -594,8 +607,6 @@ fn ui(f: &mut Frame, app: &App) {
             .constraints([Constraint::Percentage(100)])
             .split(layout[1])
     };
-
-    let track = &app.tracks[app.current_track];
 
     let title = Block::default()
         .borders(Borders::TOP)
@@ -657,7 +668,26 @@ fn ui(f: &mut Frame, app: &App) {
             .highlight_style(Style::default().bold())
     };
 
-    f.render_stateful_widget(list, center_layout[0], &mut app.list_state.clone());
+    f.render_stateful_widget(list, center_layout[0], &mut list_state);
+
+    let scrollbar = Scrollbar::default()
+        .orientation(ScrollbarOrientation::VerticalRight)
+        .thumb_symbol("█")
+        .track_symbol(None)
+        .begin_symbol(Some("▲"))
+        .end_symbol(Some("▼"))
+        .style(Style::default().fg(accent_color));
+
+    f.render_stateful_widget(
+        scrollbar,
+        Rect {
+            x: center_layout[0].width.saturating_sub(2),
+            y: center_layout[0].y.saturating_add(1),
+            width: 1,
+            height: center_layout[0].height.saturating_sub(2),
+        },
+        &mut scrollbar_state
+    );
 
     let metadata = &track.metadata;
     
@@ -838,6 +868,25 @@ fn scan_music_files(dir: &Path, recursive: bool) -> Result<Vec<Track>> {
         }
     }
 
+    tracks.sort_by(
+        |a, b| {
+            let a_title = a
+                .metadata
+                .title
+                .as_deref()
+                .unwrap_or("")
+                .to_lowercase();
+            let b_title = b
+                .metadata
+                .title
+                .as_deref()
+                .unwrap_or("")
+                .to_lowercase();
+
+            return a_title.cmp(&b_title);
+        }
+    );
+
     return Ok(tracks);
 }
 
@@ -862,9 +911,6 @@ fn format_duration(d: Duration) -> String {
 
 fn toggle_playback(app: &mut App) {
     match app.playback_state {
-        PlaybackState::Stopped => {
-            play_track(app);
-        }
         PlaybackState::Playing => {
             if let Some(sink) = &app.sink {
                 sink.pause();
@@ -872,7 +918,7 @@ fn toggle_playback(app: &mut App) {
 
             app.playback_state = PlaybackState::Paused;
             app.playback_start = None;
-        }
+        },
         PlaybackState::Paused => {
             if let Some(sink) = &app.sink {
                 sink.play();
@@ -880,6 +926,9 @@ fn toggle_playback(app: &mut App) {
 
             app.playback_state = PlaybackState::Playing;
             app.playback_start = Some(Instant::now() - app.position);
+        },
+        PlaybackState::Stopped => {
+            play_track(app);
         }
     }
 }
@@ -943,6 +992,7 @@ fn next_track(app: &mut App, direction: i32) {
     app.list_state.select(Some(app.current_track));
     app.position = Duration::ZERO;
     app.playback_start = None;
+    app.scroll_state = ScrollbarState::new(app.tracks.len()).position(app.current_track);
 
     if !matches!(app.playback_state, PlaybackState::Stopped) {
         play_track(app);
