@@ -59,14 +59,21 @@ But you can set everything as you want. The config file is located at `~/.config
     ```Shell
     $ cd sonido/
     ```
-3. Compile the Rust project
-    ```Shell
-    $ cargo build --release
-    ```
-4. Copy compiled binary to the `/usr/bin/` directory
-    ```Shell
-    $ sudo cp ./target/release/sonido /usr/bin/
-    ```
+3. Choose your installation way
+    * Auto
+        1. Run installer script
+            ```Shell
+            sh install.sh
+            ```
+    * Manual
+        1. Compile the Rust project
+            ```Shell
+            $ cargo build --release
+            ```
+        2. Copy compiled binary to the `/usr/bin/` directory
+            ```Shell
+            $ sudo cp ./target/release/sonido /usr/bin/
+            ```
 
 
 ## Configuration
@@ -87,6 +94,7 @@ reload_config = "c"
 quit = "q"
 show_app_title = true
 show_playlist_title = true
+show_playlist_scrollbar = true
 show_metadata_title = true
 show_metadata_panel = true
 show_progress_title = false
@@ -98,8 +106,11 @@ app_title_alignment = "center"
 playlist_title_alignment = "left"
 metadata_title_alignment = "left"
 progress_title_alignment = "left"
+app_title_color = "blue"
+playlist_color = "blue"
+metadata_color = "blue"
+progress_color = "blue"
 rounded_corners = true
-accent_color = "blue"
 ```
 
 Note that in the `app_title_format` setting, the placeholder `{VERSION}` will be replaced with current app version installed. Press `reload_config` key or restart Sonido after editing to apply changes. Everything is simple and intuitive, so it's not necessary to write a whole guide on it

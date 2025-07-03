@@ -11,23 +11,75 @@
 #######################################
 
 
-# 1. Clean files (in case if already installed)
+# 0. Pre-installation preparations
 
-cargo clean
+set -euo pipefail
 
-sudo rm -v /usr/bin/sonido
+IFS=$'\n\t'
+
+echo "Welcome to Sonido installer script"
+
+read -rp "Continue? [Y/n] " confirm
+
+[[ -z "$confirm" || "$confirm" =~ ^[Yy]$ ]] || exit 1
 
 
-# 2. Compile the Rust project
+# 1. Check if Rust is installed
+
+echo "Checking if Rust is installed..."
+
+if ! command -v rustup &> /dev/null; then
+    echo "Rust is not installed. Installing Rust... (needed to compile Sonido app)"
+
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+
+    export PATH="$PATH:$HOME/.cargo/bin"
+
+    source "$HOME/.cargo/env"
+
+    echo "Rust has been installed"
+else
+    echo "Rust is already installed"
+fi
+
+
+# 2. Check if running in the project directory
+
+if [ ! -f "Cargo.toml" ]; then
+    echo "This script must be run from the project root"
+
+    exit 1
+fi
+
+
+# 3. Clean files (in case if already installed)
+
+echo "Cleaning old project files..."
+
+cargo clean || true
+
+[ -f /usr/bin/sonido ] && sudo rm -vf /usr/bin/sonido || true
+
+
+# 4. Compile the Rust project
+
+echo "Compiling Sonido..."
 
 cargo build --release
 
 
-# 3. Copy compiled binary to the `/usr/bin/` directory
+# 5. Copy compiled binary to the `/usr/bin/` directory
+
+echo "Copying binary file to '/usr/bin/'..."
 
 sudo cp -v \
     ./target/release/sonido \
     /usr/bin/
+
+
+# 6. After installation
+
+echo "Sonido installed successfully"
 
 
 # Success!

@@ -15,7 +15,7 @@ use std::{
     time::{
         Duration,
         Instant,
-    },
+    }
 };
 use anyhow::Result;
 use crossterm::{
@@ -24,7 +24,6 @@ use crossterm::{
         Event,
         KeyCode,
         KeyEventKind,
-        KeyModifiers,
     },
     execute,
     terminal::{
@@ -155,6 +154,7 @@ struct ConfigSettings {
     quit: String,
     show_app_title: bool,
     show_playlist_title: bool,
+    show_playlist_scrollbar: bool,
     show_metadata_title: bool,
     show_metadata_panel: bool,
     show_progress_title: bool,
@@ -166,8 +166,11 @@ struct ConfigSettings {
     playlist_title_alignment: String,
     metadata_title_alignment: String,
     progress_title_alignment: String,
+    app_title_color: String,
+    playlist_color: String,
+    metadata_color: String,
+    progress_color: String,
     rounded_corners: bool,
-    accent_color: String,
 }
 
 impl Default for ConfigSettings {
@@ -185,6 +188,7 @@ impl Default for ConfigSettings {
             quit: "q".into(),
             show_app_title: true,
             show_playlist_title: true,
+            show_playlist_scrollbar: true,
             show_metadata_title: true,
             show_metadata_panel: true,
             show_progress_title: false,
@@ -196,8 +200,11 @@ impl Default for ConfigSettings {
             playlist_title_alignment: "left".into(),
             metadata_title_alignment: "left".into(),
             progress_title_alignment: "left".into(),
+            app_title_color: "blue".into(),
+            metadata_color: "blue".into(),
+            playlist_color: "blue".into(),
+            progress_color: "blue".into(),
             rounded_corners: true,
-            accent_color: "blue".into(),
         }
     }
 }
@@ -554,6 +561,7 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>, app: &mut
 fn ui(f: &mut Frame, app: &App) {
     let show_app_title = app.config.show_app_title;
     let show_playlist_title = app.config.show_playlist_title;
+    let show_playlist_scrollbar = app.config.show_playlist_scrollbar;
     let show_metadata_title = app.config.show_metadata_title;
     let show_metadata_panel = app.config.show_metadata_panel;
     let show_progress_title = app.config.show_progress_title;
@@ -570,7 +578,10 @@ fn ui(f: &mut Frame, app: &App) {
 
     let rounded_corners = app.config.rounded_corners;
 
-    let accent_color = parse_color(&app.config.accent_color);
+    let app_title_color = parse_color(&app.config.app_title_color);
+    let playlist_color = parse_color(&app.config.playlist_color);
+    let metadata_color = parse_color(&app.config.metadata_color);
+    let progress_color = parse_color(&app.config.progress_color);
 
     let mut list_state = app.list_state.clone();
     let track = &app.tracks[app.current_track];
@@ -611,7 +622,7 @@ fn ui(f: &mut Frame, app: &App) {
     let title = Block::default()
         .borders(Borders::TOP)
         .border_set(border_set)
-        .border_style(Style::default().fg(accent_color))
+        .border_style(Style::default().fg(app_title_color))
         .title(app_title_format)
         .title_alignment(app_title_alignment);
 
@@ -637,7 +648,7 @@ fn ui(f: &mut Frame, app: &App) {
                 });
             
             let style = if i == app.current_track {
-                Style::default().fg(accent_color)
+                Style::default().fg(playlist_color)
             } else {
                 Style::default()
             };
@@ -652,7 +663,7 @@ fn ui(f: &mut Frame, app: &App) {
                 Block::default()
                     .borders(Borders::ALL)
                     .border_set(border_set)
-                    .border_style(Style::default().fg(accent_color))
+                    .border_style(Style::default().fg(playlist_color))
                     .title(playlist_title_format)
                     .title_alignment(playlist_title_alignment),
             )
@@ -663,37 +674,38 @@ fn ui(f: &mut Frame, app: &App) {
                 Block::default()
                     .borders(Borders::ALL)
                     .border_set(border_set)
-                    .border_style(Style::default().fg(accent_color))
+                    .border_style(Style::default().fg(playlist_color))
             )
             .highlight_style(Style::default().bold())
     };
 
     f.render_stateful_widget(list, center_layout[0], &mut list_state);
-
     let scrollbar = Scrollbar::default()
         .orientation(ScrollbarOrientation::VerticalRight)
         .thumb_symbol("█")
         .track_symbol(None)
         .begin_symbol(Some("▲"))
         .end_symbol(Some("▼"))
-        .style(Style::default().fg(accent_color));
+        .style(Style::default().fg(playlist_color));
 
-    f.render_stateful_widget(
-        scrollbar,
-        Rect {
-            x: center_layout[0].width.saturating_sub(2),
-            y: center_layout[0].y.saturating_add(1),
-            width: 1,
-            height: center_layout[0].height.saturating_sub(2),
-        },
-        &mut scrollbar_state
-    );
+    if show_playlist_scrollbar {
+        f.render_stateful_widget(
+            scrollbar,
+            Rect {
+                x: center_layout[0].width.saturating_sub(2),
+                y: center_layout[0].y.saturating_add(1),
+                width: 1,
+                height: center_layout[0].height.saturating_sub(2),
+            },
+            &mut scrollbar_state
+        );
+    }
 
     let metadata = &track.metadata;
     
     let mut lines = vec![
         Line::from(vec![
-            Span::styled("Title: ", Style::default().fg(accent_color)),
+            Span::styled("Title: ", Style::default().fg(metadata_color)),
             Span::raw(
                 metadata
                     .title
@@ -702,7 +714,7 @@ fn ui(f: &mut Frame, app: &App) {
             ),
         ]),
         Line::from(vec![
-            Span::styled("Artist: ", Style::default().fg(accent_color)),
+            Span::styled("Artist: ", Style::default().fg(metadata_color)),
             Span::raw(
                 metadata
                     .artist
@@ -711,49 +723,49 @@ fn ui(f: &mut Frame, app: &App) {
             ),
         ]),
         Line::from(vec![
-            Span::styled("Duration: ", Style::default().fg(accent_color)),
+            Span::styled("Duration: ", Style::default().fg(metadata_color)),
             Span::raw(format_duration(track.duration)),
         ]),
     ];
     
     if let Some(album) = &metadata.album {
         lines.push(Line::from(vec![
-            Span::styled("Album: ", Style::default().fg(accent_color)),
+            Span::styled("Album: ", Style::default().fg(metadata_color)),
             Span::raw(album),
         ]));
     }
     
     if let Some(year) = &metadata.year {
         lines.push(Line::from(vec![
-            Span::styled("Year: ", Style::default().fg(accent_color)),
+            Span::styled("Year: ", Style::default().fg(metadata_color)),
             Span::raw(year),
         ]));
     }
     
     if let Some(genre) = &metadata.genre {
         lines.push(Line::from(vec![
-            Span::styled("Genre: ", Style::default().fg(accent_color)),
+            Span::styled("Genre: ", Style::default().fg(metadata_color)),
             Span::raw(genre),
         ]));
     }
     
     if let Some(track_num) = metadata.track_number {
         lines.push(Line::from(vec![
-            Span::styled("Track: ", Style::default().fg(accent_color)),
+            Span::styled("Track: ", Style::default().fg(metadata_color)),
             Span::raw(track_num.to_string()),
         ]));
     }
 
     if let Some(bitrate) = metadata.bitrate {
         lines.push(Line::from(vec![
-            Span::styled("Bitrate: ", Style::default().fg(accent_color)),
+            Span::styled("Bitrate: ", Style::default().fg(metadata_color)),
             Span::raw(format!("{} kbps", bitrate)),
         ]));
     }
 
     if let Some(sample_rate) = metadata.sample_rate {
         lines.push(Line::from(vec![
-            Span::styled("Sample Rate: ", Style::default().fg(accent_color)),
+            Span::styled("Sample Rate: ", Style::default().fg(metadata_color)),
             Span::raw(format!("{} Hz", sample_rate)),
         ]));
     }
@@ -766,7 +778,7 @@ fn ui(f: &mut Frame, app: &App) {
         };
 
         lines.push(Line::from(vec![
-            Span::styled("Channels: ", Style::default().fg(accent_color)),
+            Span::styled("Channels: ", Style::default().fg(metadata_color)),
             Span::raw(channel_str),
         ]));
     }
@@ -775,14 +787,14 @@ fn ui(f: &mut Frame, app: &App) {
         Block::default()
             .borders(Borders::ALL)
             .border_set(border_set)
-            .border_style(Style::default().fg(accent_color))
+            .border_style(Style::default().fg(metadata_color))
             .title(metadata_title_format)
             .title_alignment(metadata_title_alignment)
     } else {
         Block::default()
             .borders(Borders::ALL)
             .border_set(border_set)
-            .border_style(Style::default().fg(accent_color))
+            .border_style(Style::default().fg(metadata_color))
     };
 
     let metadata_widget = Paragraph::new(lines)
@@ -805,11 +817,11 @@ fn ui(f: &mut Frame, app: &App) {
                 Block::default()
                     .borders(Borders::ALL)
                     .border_set(border_set)
-                    .border_style(Style::default().fg(accent_color))
+                    .border_style(Style::default().fg(progress_color))
                     .title(progress_title_format)
                     .title_alignment(progress_title_alignment),
             )
-            .gauge_style(Style::default().fg(accent_color))
+            .gauge_style(Style::default().fg(progress_color))
             .ratio(progress)
             .label(progress_text)
             .use_unicode(true)
@@ -819,9 +831,9 @@ fn ui(f: &mut Frame, app: &App) {
                 Block::default()
                     .borders(Borders::ALL)
                     .border_set(border_set)
-                    .border_style(Style::default().fg(accent_color)),
+                    .border_style(Style::default().fg(progress_color)),
             )
-            .gauge_style(Style::default().fg(accent_color))
+            .gauge_style(Style::default().fg(progress_color))
             .ratio(progress)
             .label(progress_text)
             .use_unicode(true)
