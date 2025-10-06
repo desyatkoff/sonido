@@ -51,13 +51,29 @@ But you can set everything as you want. The config file is located at `~/.config
 
 ## Installation
 
+It is recommended to install Sonido from AUR (Arch User Repository) if you are an Arch Linux user
+
+You can use `yay` AUR helper:
+
+```Shell
+yay -S sonido 
+```
+
+Or install manually:
+
+```
+git clone https://aur.archlinux.org/sonido.git && cd sonido/ && makepkg -si
+```
+
+If you use some other OS, read the instructions below:
+
 1. Clone the repository
     ```Shell
-    $ git clone https://github.com/desyatkoff/sonido.git
+    git clone https://github.com/desyatkoff/sonido.git
     ```
 2. Go to the repository directory
     ```Shell
-    $ cd sonido/
+    cd sonido/
     ```
 3. Choose your installation way
     * Auto
@@ -68,11 +84,11 @@ But you can set everything as you want. The config file is located at `~/.config
     * Manual
         1. Compile the Rust project
             ```Shell
-            $ cargo build --release
+            cargo build --release
             ```
         2. Copy compiled binary to the `/usr/bin/` directory
             ```Shell
-            $ sudo cp ./target/release/sonido /usr/bin/
+            sudo cp ./target/release/sonido /usr/bin/
             ```
 
 
@@ -123,11 +139,11 @@ Config presets you can find [here](assets/configs/) or simply make your own one
 * Get help
     + Short
         ```Shell
-        $ sonido -h
+        sonido -h
         ```
     + Full
         ```Shell
-        $ sonido --help
+        sonido --help
         ```
 * Get music from current working directory
     ```Shell
@@ -136,33 +152,33 @@ Config presets you can find [here](assets/configs/) or simply make your own one
 * Get music recursively from current working directory (from all subdirectories)
     + Short
         ```Shell
-        $ sonido -r
+        sonido -r
         ```
     + Full
         ```Shell
-        $ sonido --recursive
+        sonido --recursive
         ```
 * Get music from `~/Music/`
     ```Shell
-    $ sonido ~/Music/
+    sonido ~/Music/
     ```
 * Get music recursively from `~/Music/`
     + Short
         ```Shell
-        $ sonido -r ~/Music/
+        sonido -r ~/Music/
         ```
     + Full
         ```Shell
-        $ sonido --recursive ~/Music/
+        sonido --recursive ~/Music/
         ```
 * Get version
     + Short
         ```Shell
-        $ sonido -V
+        sonido -V
         ```
     + Full
         ```Shell
-        $ sonido --version
+        sonido --version
         ```
 
 
