@@ -114,17 +114,17 @@ struct Config {
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 struct ConfigSettings {
-    toggle_playback: String,
-    toggle_repeat: String,
-    seek_backward: String,
-    seek_forward: String,
+    toggle_playback: Vec<String>,
+    toggle_repeat: Vec<String>,
+    seek_backward: Vec<String>,
+    seek_forward: Vec<String>,
     seek_step: u64,
-    previous_track: String,
-    next_track: String,
-    hide_track: String,
-    toggle_metadata_panel: String,
-    reload_config: String,
-    quit: String,
+    previous_track: Vec<String>,
+    next_track: Vec<String>,
+    hide_track: Vec<String>,
+    toggle_metadata_panel: Vec<String>,
+    reload_config: Vec<String>,
+    quit: Vec<String>,
     show_app_title: bool,
     show_playlist_title: bool,
     show_playlist_scrollbar: bool,
@@ -149,17 +149,17 @@ struct ConfigSettings {
 impl Default for ConfigSettings {
     fn default() -> Self {
         ConfigSettings {
-            toggle_playback: "space".into(),
-            toggle_repeat: "r".into(),
-            seek_backward: "left".into(),
-            seek_forward: "right".into(),
+            toggle_playback: vec!["space".to_string()],
+            toggle_repeat: vec!["r".to_string()],
+            seek_backward: vec!["h".to_string(), "left".to_string()],
+            seek_forward: vec!["l".to_string(), "right".to_string()],
             seek_step: 5,
-            previous_track: "up".into(),
-            next_track: "down".into(),
-            hide_track: "h".into(),
-            toggle_metadata_panel: "m".into(),
-            reload_config: "c".into(),
-            quit: "q".into(),
+            previous_track: vec!["k".to_string(), "up".to_string()],
+            next_track: vec!["j".to_string(), "down".to_string()],
+            hide_track: vec!["x".to_string()],
+            toggle_metadata_panel: vec!["m".to_string()],
+            reload_config: vec!["c".to_string()],
+            quit: vec!["q".to_string()],
             show_app_title: true,
             show_playlist_title: true,
             show_playlist_scrollbar: true,
@@ -342,6 +342,12 @@ fn parse_key(key_str: &str) -> KeyCode {
     }
 }
 
+fn matches_key(key_code: KeyCode, bindings: &[String]) -> bool {
+    bindings
+        .iter()
+        .any(|binding| parse_key(binding) == key_code)
+}
+
 fn parse_alignment(alignment_str: &str) -> Alignment {
     match alignment_str.to_lowercase().as_str() {
         "left" => Alignment::Left,
@@ -413,34 +419,34 @@ fn run_app(
             && key.kind == KeyEventKind::Press
         {
             match key.code {
-                _ if key.code == parse_key(&app.config.quit) => {
+                _ if matches_key(key.code, &app.config.quit) => {
                     return Ok(());
                 }
-                _ if key.code == parse_key(&app.config.toggle_playback) => {
+                _ if matches_key(key.code, &app.config.toggle_playback) => {
                     toggle_playback(app);
                 }
-                _ if key.code == parse_key(&app.config.toggle_repeat) => {
+                _ if matches_key(key.code, &app.config.toggle_repeat) => {
                     toggle_repeat(app);
                 }
-                _ if key.code == parse_key(&app.config.seek_backward) => {
+                _ if matches_key(key.code, &app.config.seek_backward) => {
                     seek(app, -(app.config.seek_step as i64));
                 }
-                _ if key.code == parse_key(&app.config.seek_forward) => {
+                _ if matches_key(key.code, &app.config.seek_forward) => {
                     seek(app, app.config.seek_step as i64);
                 }
-                _ if key.code == parse_key(&app.config.previous_track) => {
+                _ if matches_key(key.code, &app.config.previous_track) => {
                     next_track(app, -1);
                 }
-                _ if key.code == parse_key(&app.config.next_track) => {
+                _ if matches_key(key.code, &app.config.next_track) => {
                     next_track(app, 1);
                 }
-                _ if key.code == parse_key(&app.config.hide_track) => {
+                _ if matches_key(key.code, &app.config.hide_track) => {
                     hide_track(app, app.current_track);
                 }
-                _ if key.code == parse_key(&app.config.toggle_metadata_panel) => {
+                _ if matches_key(key.code, &app.config.toggle_metadata_panel) => {
                     app.config.show_metadata_panel = !app.config.show_metadata_panel;
                 }
-                _ if key.code == parse_key(&app.config.reload_config) => {
+                _ if matches_key(key.code, &app.config.reload_config) => {
                     app.config = load_config();
                 }
                 _ => {}
