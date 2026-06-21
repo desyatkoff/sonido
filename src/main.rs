@@ -17,7 +17,7 @@
  * along with Sonido. If not, see <https://www.gnu.org/licenses/>
  */
 
-use anyhow::Result;
+use colored::Colorize;
 use crossterm::{
     event::{self, Event, KeyCode, KeyEventKind},
     execute,
@@ -38,6 +38,7 @@ use rodio::{Decoder, OutputStream, Sink, Source};
 use serde::{Deserialize, Serialize};
 use std::{
     env,
+    error::Error,
     path::{Path, PathBuf},
     time::{Duration, Instant},
 };
@@ -200,7 +201,7 @@ enum PlaybackState {
     Stopped,
 }
 
-fn main() -> Result<()> {
+fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = env::args().collect();
     let (help, recursive, version, music_directory) = parse_args(&args);
     let tracks = scan_music_files(&music_directory, recursive)?;
@@ -244,7 +245,13 @@ the Free Software Foundation, either version 3 of the License, or
     }
 
     if tracks.is_empty() {
-        anyhow::bail!("No music files found in {}", music_directory.display());
+        eprintln!(
+            "{}: no music files found in {}",
+            Colorize::red("error").bold(),
+            music_directory.display()
+        );
+
+        return Ok(());
     }
 
     enable_raw_mode()?;
@@ -398,7 +405,7 @@ fn load_config() -> ConfigSettings {
 fn run_app(
     terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
     app: &mut App,
-) -> Result<()> {
+) -> Result<(), Box<dyn Error>> {
     loop {
         terminal.draw(|f| ui(f, app))?;
 
@@ -715,7 +722,7 @@ fn ui(f: &mut Frame, app: &App) {
     f.render_widget(progress_gauge, layout[2]);
 }
 
-fn scan_music_files(dir: &Path, recursive: bool) -> Result<Vec<Track>> {
+fn scan_music_files(dir: &Path, recursive: bool) -> Result<Vec<Track>, Box<dyn Error>> {
     let mut tracks = Vec::new();
     let extensions = ["mp3", "aac", "wav", "flac", "alac", "aiff", "aif", "m4a"];
 
@@ -754,7 +761,7 @@ fn scan_music_files(dir: &Path, recursive: bool) -> Result<Vec<Track>> {
     Ok(tracks)
 }
 
-fn get_audio_duration(path: &Path) -> Result<Duration> {
+fn get_audio_duration(path: &Path) -> Result<Duration, Box<dyn Error>> {
     let file = std::fs::File::open(path)?;
     let source = Decoder::new(std::io::BufReader::new(file))?;
 
