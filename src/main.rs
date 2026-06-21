@@ -24,7 +24,7 @@ use crossterm::{
     execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
-use directories::ProjectDirs;
+use directories::{BaseDirs, ProjectDirs};
 use lofty::{file::AudioFile, file::TaggedFileExt, read_from_path, tag::Accessor};
 use ratatui::{
     Frame,
@@ -40,6 +40,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     env,
     error::Error,
+    fs,
     path::{Path, PathBuf},
     time::{Duration, Instant},
 };
@@ -54,10 +55,13 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
     version
 )]
 struct Args {
+    #[arg(short = 'p', long = "playlist", conflicts_with = "path")]
+    playlist: Option<PathBuf>,
+
     #[arg(short = 'r', long = "recursive")]
     recursive: bool,
 
-    #[arg(default_value = ".")]
+    #[arg(default_value = ".", conflicts_with = "playlist")]
     path: Vec<PathBuf>,
 }
 
@@ -220,7 +224,12 @@ enum PlaybackState {
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
-    let tracks = scan_music_files(args.path, args.recursive)?;
+
+    let tracks = if args.playlist.is_some() {
+        scan_playlist_file(args.playlist.unwrap(), args.recursive)?
+    } else {
+        scan_music_files(args.path, args.recursive)?
+    };
 
     if tracks.is_empty() {
         eprintln!(
@@ -671,6 +680,23 @@ fn ui(f: &mut Frame, app: &App) {
     };
 
     f.render_widget(progress_gauge, layout[2]);
+}
+
+fn expand_tilde(path: &str) -> PathBuf {
+    if let Some(stripped) = path.strip_prefix("~/")
+        && let Some(base_dirs) = BaseDirs::new()
+    {
+        return base_dirs.home_dir().join(stripped);
+    }
+
+    PathBuf::from(path)
+}
+
+fn scan_playlist_file(path_buf: PathBuf, recursive: bool) -> Result<Vec<Track>, Box<dyn Error>> {
+    let content = fs::read_to_string(path_buf)?;
+    let vec_path_buf: Vec<PathBuf> = content.lines().map(expand_tilde).collect();
+
+    scan_music_files(vec_path_buf, recursive)
 }
 
 fn scan_music_files(
