@@ -56,8 +56,13 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 )]
 struct Args {
     /// Scan path(s) from text file instead of specifying paths in arg
-    #[arg(short = 'p', long = "playlist", conflicts_with = "path")]
-    playlist: Option<PathBuf>,
+    #[arg(
+        short = 'p',
+        long = "playlist",
+        num_args = 0..=1,
+        default_missing_value = ""
+    )]
+    playlist: Option<String>,
 
     /// Scan path(s) recursively
     #[arg(short = 'r', long = "recursive")]
@@ -229,7 +234,16 @@ fn main() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
 
     let tracks = if args.playlist.is_some() {
-        scan_playlist_file(args.playlist.unwrap(), args.recursive)?
+        let playlist_path = match args.playlist.as_deref() {
+            Some("") => ProjectDirs::from("", "", "sonido")
+                .unwrap()
+                .config_dir()
+                .join("playlist.txt"),
+            Some(path) => PathBuf::from(path),
+            None => PathBuf::new(),
+        };
+
+        scan_playlist_file(playlist_path, args.recursive)?
     } else {
         scan_music_files(args.path, args.recursive)?
     };
