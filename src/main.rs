@@ -68,6 +68,10 @@ struct Args {
     #[arg(short = 'r', long = "recursive")]
     recursive: bool,
 
+    /// Sort tracks in alphabetical order
+    #[arg(short = 's', long = "sort")]
+    sort: bool,
+
     /// Which path(s) to scan for music
     #[arg(default_value = ".", conflicts_with = "playlist")]
     path: Vec<PathBuf>,
@@ -243,9 +247,9 @@ fn main() -> Result<(), Box<dyn Error>> {
             None => PathBuf::new(),
         };
 
-        scan_playlist_file(playlist_path, args.recursive)?
+        scan_playlist_file(playlist_path, args.recursive, args.sort)?
     } else {
-        scan_music_files(args.path, args.recursive)?
+        scan_music_files(args.path, args.recursive, args.sort)?
     };
 
     if tracks.is_empty() {
@@ -709,16 +713,21 @@ fn expand_tilde(path: &str) -> PathBuf {
     PathBuf::from(path)
 }
 
-fn scan_playlist_file(path_buf: PathBuf, recursive: bool) -> Result<Vec<Track>, Box<dyn Error>> {
+fn scan_playlist_file(
+    path_buf: PathBuf,
+    recursive: bool,
+    sort: bool,
+) -> Result<Vec<Track>, Box<dyn Error>> {
     let content = fs::read_to_string(path_buf)?;
     let vec_path_buf: Vec<PathBuf> = content.lines().map(expand_tilde).collect();
 
-    scan_music_files(vec_path_buf, recursive)
+    scan_music_files(vec_path_buf, recursive, sort)
 }
 
 fn scan_music_files(
     vec_path_buf: Vec<PathBuf>,
     recursive: bool,
+    sort: bool,
 ) -> Result<Vec<Track>, Box<dyn Error>> {
     let mut tracks = Vec::new();
     let extensions = ["mp3", "aac", "wav", "flac", "alac", "aiff", "aif", "m4a"];
@@ -763,12 +772,14 @@ fn scan_music_files(
         }
     }
 
-    tracks.sort_by(|a, b| {
-        let a_title = a.metadata.title.as_deref().unwrap_or("").to_lowercase();
-        let b_title = b.metadata.title.as_deref().unwrap_or("").to_lowercase();
+    if sort {
+        tracks.sort_by(|a, b| {
+            let a_title = a.metadata.title.as_deref().unwrap_or("").to_lowercase();
+            let b_title = b.metadata.title.as_deref().unwrap_or("").to_lowercase();
 
-        a_title.cmp(&b_title)
-    });
+            a_title.cmp(&b_title)
+        });
+    }
 
     Ok(tracks)
 }
