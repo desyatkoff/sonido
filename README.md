@@ -120,6 +120,10 @@ Config presets you can find [here](assets/configs/) or simply make your own one
     ```Shell
     sonido -r ~/Music/
     ```
+* Get `track1.mp3` only, skip all other files
+    ```Shell
+    sonido ~/Music/track1.mp3
+    ```
 * Get version
     ```Shell
     sonido -V
