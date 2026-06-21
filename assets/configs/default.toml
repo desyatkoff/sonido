@@ -1,14 +1,15 @@
 [config]
-toggle_playback = "space"
-toggle_repeat = "r"
-seek_backward = "left"
-seek_forward = "right"
+toggle_playback = ["space"]
+toggle_repeat = ["r"]
+seek_backward = ["h", "left"]
+seek_forward = ["l", "right"]
 seek_step = 5
-previous_track = "up"
-next_track = "down"
-hide_track = "h"
-reload_config = "c"
-quit = "q"
+previous_track = ["k", "up"]
+next_track = ["j", "down"]
+hide_track = ["x"]
+toggle_metadata_panel = ["m"]
+reload_config = ["c"]
+quit = ["q"]
 show_app_title = true
 show_playlist_title = true
 show_playlist_scrollbar = true
