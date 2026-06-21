@@ -674,32 +674,46 @@ fn ui(f: &mut Frame, app: &App) {
     f.render_widget(progress_gauge, layout[2]);
 }
 
-fn scan_music_files(dir: &Path, recursive: bool) -> Result<Vec<Track>, Box<dyn Error>> {
+fn scan_music_files(path: &Path, recursive: bool) -> Result<Vec<Track>, Box<dyn Error>> {
     let mut tracks = Vec::new();
     let extensions = ["mp3", "aac", "wav", "flac", "alac", "aiff", "aif", "m4a"];
 
-    let walker = if recursive {
-        WalkDir::new(dir).into_iter()
-    } else {
-        WalkDir::new(dir).max_depth(1).into_iter()
-    };
+    if path.is_dir() {
+        let walker = if recursive {
+            WalkDir::new(path).into_iter()
+        } else {
+            WalkDir::new(path).max_depth(1).into_iter()
+        };
 
-    for entry in walker.filter_map(|e| e.ok()) {
-        let path = entry.path();
+        for entry in walker.filter_map(|e| e.ok()) {
+            let path = entry.path();
 
-        if path.is_file()
-            && let Some(ext) = path.extension().and_then(|e| e.to_str())
-            && extensions.contains(&ext.to_lowercase().as_str())
-        {
-            let duration = get_audio_duration(path).unwrap_or(Duration::ZERO);
-            let metadata = Metadata::from_path(path);
+            if path.is_file()
+                && let Some(ext) = path.extension().and_then(|e| e.to_str())
+                && extensions.contains(&ext.to_lowercase().as_str())
+            {
+                let duration = get_audio_duration(path).unwrap_or(Duration::ZERO);
+                let metadata = Metadata::from_path(path);
 
-            tracks.push(Track {
-                path: path.to_path_buf(),
-                duration,
-                metadata,
-            });
+                tracks.push(Track {
+                    path: path.to_path_buf(),
+                    duration,
+                    metadata,
+                });
+            }
         }
+    } else if path.is_file()
+        && let Some(ext) = path.extension().and_then(|e| e.to_str())
+        && extensions.contains(&ext.to_lowercase().as_str())
+    {
+        let duration = get_audio_duration(path).unwrap_or(Duration::ZERO);
+        let metadata = Metadata::from_path(path);
+
+        tracks.push(Track {
+            path: path.to_path_buf(),
+            duration,
+            metadata,
+        });
     }
 
     tracks.sort_by(|a, b| {
