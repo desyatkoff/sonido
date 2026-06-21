@@ -122,6 +122,7 @@ struct ConfigSettings {
     previous_track: String,
     next_track: String,
     hide_track: String,
+    toggle_metadata_panel: String,
     reload_config: String,
     quit: String,
     show_app_title: bool,
@@ -156,6 +157,7 @@ impl Default for ConfigSettings {
             previous_track: "up".into(),
             next_track: "down".into(),
             hide_track: "h".into(),
+            toggle_metadata_panel: "m".into(),
             reload_config: "c".into(),
             quit: "q".into(),
             show_app_title: true,
@@ -436,6 +438,9 @@ fn run_app(
                         }
                         _ if key.code == parse_key(&app.config.hide_track) => {
                             hide_track(app, app.current_track);
+                        }
+                        _ if key.code == parse_key(&app.config.toggle_metadata_panel) => {
+                            app.config.show_metadata_panel = !app.config.show_metadata_panel;
                         }
                         _ if key.code == parse_key(&app.config.reload_config) => {
                             app.config = load_config();
