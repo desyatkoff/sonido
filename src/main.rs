@@ -58,7 +58,7 @@ struct Args {
     recursive: bool,
 
     #[arg(default_value = ".")]
-    path: PathBuf,
+    path: Vec<PathBuf>,
 }
 
 struct Track {
@@ -220,13 +220,12 @@ enum PlaybackState {
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
-    let tracks = scan_music_files(&args.path, args.recursive)?;
+    let tracks = scan_music_files(args.path, args.recursive)?;
 
     if tracks.is_empty() {
         eprintln!(
-            "{} no music files found in {}",
+            "{} could not find any music",
             Colorize::red("error:").bold(),
-            args.path.display()
         );
 
         return Ok(());
@@ -674,46 +673,51 @@ fn ui(f: &mut Frame, app: &App) {
     f.render_widget(progress_gauge, layout[2]);
 }
 
-fn scan_music_files(path: &Path, recursive: bool) -> Result<Vec<Track>, Box<dyn Error>> {
+fn scan_music_files(
+    vec_path_buf: Vec<PathBuf>,
+    recursive: bool,
+) -> Result<Vec<Track>, Box<dyn Error>> {
     let mut tracks = Vec::new();
     let extensions = ["mp3", "aac", "wav", "flac", "alac", "aiff", "aif", "m4a"];
 
-    if path.is_dir() {
-        let walker = if recursive {
-            WalkDir::new(path).into_iter()
-        } else {
-            WalkDir::new(path).max_depth(1).into_iter()
-        };
+    for path_buf in vec_path_buf {
+        if path_buf.is_dir() {
+            let walker = if recursive {
+                WalkDir::new(path_buf).into_iter()
+            } else {
+                WalkDir::new(path_buf).max_depth(1).into_iter()
+            };
 
-        for entry in walker.filter_map(|e| e.ok()) {
-            let path = entry.path();
+            for entry in walker.filter_map(|e| e.ok()) {
+                let path = entry.path();
 
-            if path.is_file()
-                && let Some(ext) = path.extension().and_then(|e| e.to_str())
-                && extensions.contains(&ext.to_lowercase().as_str())
-            {
-                let duration = get_audio_duration(path).unwrap_or(Duration::ZERO);
-                let metadata = Metadata::from_path(path);
+                if path.is_file()
+                    && let Some(ext) = path.extension().and_then(|e| e.to_str())
+                    && extensions.contains(&ext.to_lowercase().as_str())
+                {
+                    let duration = get_audio_duration(path).unwrap_or(Duration::ZERO);
+                    let metadata = Metadata::from_path(path);
 
-                tracks.push(Track {
-                    path: path.to_path_buf(),
-                    duration,
-                    metadata,
-                });
+                    tracks.push(Track {
+                        path: path.to_path_buf(),
+                        duration,
+                        metadata,
+                    });
+                }
             }
-        }
-    } else if path.is_file()
-        && let Some(ext) = path.extension().and_then(|e| e.to_str())
-        && extensions.contains(&ext.to_lowercase().as_str())
-    {
-        let duration = get_audio_duration(path).unwrap_or(Duration::ZERO);
-        let metadata = Metadata::from_path(path);
+        } else if path_buf.is_file()
+            && let Some(ext) = path_buf.extension().and_then(|e| e.to_str())
+            && extensions.contains(&ext.to_lowercase().as_str())
+        {
+            let duration = get_audio_duration(&path_buf).unwrap_or(Duration::ZERO);
+            let metadata = Metadata::from_path(&path_buf);
 
-        tracks.push(Track {
-            path: path.to_path_buf(),
-            duration,
-            metadata,
-        });
+            tracks.push(Track {
+                path: path_buf.to_path_buf(),
+                duration,
+                metadata,
+            });
+        }
     }
 
     tracks.sort_by(|a, b| {
