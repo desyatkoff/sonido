@@ -17,6 +17,7 @@
  * along with Sonido. If not, see <https://www.gnu.org/licenses/>
  */
 
+use clap::Parser;
 use colored::Colorize;
 use crossterm::{
     event::{self, Event, KeyCode, KeyEventKind},
@@ -45,6 +46,20 @@ use std::{
 use walkdir::WalkDir;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+#[derive(Parser, Debug)]
+#[command(
+    name = "Sonido",
+    about = "A sleek, terminal-based music player written in Rust",
+    version
+)]
+struct Args {
+    #[arg(short = 'r', long = "recursive")]
+    recursive: bool,
+
+    #[arg(default_value = ".")]
+    path: PathBuf,
+}
 
 struct Track {
     path: PathBuf,
@@ -204,53 +219,14 @@ enum PlaybackState {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let args: Vec<String> = env::args().collect();
-    let (help, recursive, version, music_directory) = parse_args(&args);
-    let tracks = scan_music_files(&music_directory, recursive)?;
-
-    if help {
-        println!(
-            r#"
-USAGE:
-    sonido [OPTIONS] [PATH]
-
-OPTIONS:
-    -h, --help       Print this help message
-    -r, --recursive  Get music files from all subdirectories
-    -V, --version    Print version
-            "#
-        );
-
-        return Ok(());
-    } else if version {
-        println!(
-            r#"
- ____              _     _
-/ ___|  ___  _ __ (_) __| | ___
-\___ \ / _ \| '_ \| |/ _` |/ _ \
- ___) | (_) | | | | | (_| | (_) |
-|____/ \___/|_| |_|_|\__,_|\___/
-
-Sonido v{}
-A sleek, terminal-based music player written in Rust
-
-Copyright (C) 2026 Desyatkov Sergey
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version
-            "#,
-            VERSION
-        );
-
-        return Ok(());
-    }
+    let args = Args::parse();
+    let tracks = scan_music_files(&args.path, args.recursive)?;
 
     if tracks.is_empty() {
         eprintln!(
             "{}: no music files found in {}",
             Colorize::red("error").bold(),
-            music_directory.display()
+            args.path.display()
         );
 
         return Ok(());
@@ -287,37 +263,6 @@ the Free Software Foundation, either version 3 of the License, or
     terminal.show_cursor()?;
 
     result
-}
-
-fn parse_args(args: &[String]) -> (bool, bool, bool, PathBuf) {
-    let mut help = false;
-    let mut recursive = false;
-    let mut version = false;
-    let mut music_directory = None;
-
-    for arg in args.iter().skip(1) {
-        match arg.as_str() {
-            "-h" | "--help" => {
-                help = true;
-            }
-            "-r" | "--recursive" => {
-                recursive = true;
-            }
-            "-V" | "--version" => {
-                version = true;
-            }
-            _ if arg.starts_with('-') => {}
-            _ => {
-                if music_directory.is_none() {
-                    music_directory = Some(PathBuf::from(arg));
-                }
-            }
-        }
-    }
-
-    let music_directory = music_directory.unwrap_or_else(|| env::current_dir().unwrap());
-
-    (help, recursive, version, music_directory)
 }
 
 fn parse_key(key_str: &str) -> KeyCode {
