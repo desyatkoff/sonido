@@ -120,6 +120,10 @@ Config presets you can find [here](assets/configs/) or simply make your own one
     ```Shell
     sonido --recursive ~/Music/
     ```
+* Get tracks sorted in alphabetical order
+    ```Shell
+    sonido --sort ~/Music/
+    ```
 * Get help
     ```Shell
     sonido --help
