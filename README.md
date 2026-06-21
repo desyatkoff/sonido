@@ -100,33 +100,33 @@ Config presets you can find [here](assets/configs/) or simply make your own one
 
 ## Usage
 
-* Get help
-    ```Shell
-    sonido -h
-    ```
-* Get music from current working directory
+* Get music from current directory
     ```Shell
     sonido
     ```
-* Get music recursively from current working directory (from all subdirectories)
-    ```Shell
-    sonido -r
-    ```
-* Get music from `~/Music/`
+* Get music from `~/Music/` directory
     ```Shell
     sonido ~/Music/
     ```
-* Get music recursively from `~/Music/`
-    ```Shell
-    sonido -r ~/Music/
-    ```
-* Get `track1.mp3` only, skip all other files
+* Get `track1.mp3` only, skip other files
     ```Shell
     sonido ~/Music/track1.mp3
     ```
+* Get tracks from text file which contains paths (directories and audio files) separated by newlines
+    ```Shell
+    sonido --playlist ~/.config/sonido/playlist.txt
+    ```
+* Get tracks recursively from all subdirectories
+    ```Shell
+    sonido --recursive ~/Music/
+    ```
+* Get help
+    ```Shell
+    sonido --help
+    ```
 * Get version
     ```Shell
-    sonido -V
+    sonido --version
     ```
 
 ## Feedback
