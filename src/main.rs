@@ -55,12 +55,15 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
     version
 )]
 struct Args {
+    /// Scan path(s) from text file instead of specifying paths in arg
     #[arg(short = 'p', long = "playlist", conflicts_with = "path")]
     playlist: Option<PathBuf>,
 
+    /// Scan path(s) recursively
     #[arg(short = 'r', long = "recursive")]
     recursive: bool,
 
+    /// Which path(s) to scan for music
     #[arg(default_value = ".", conflicts_with = "playlist")]
     path: Vec<PathBuf>,
 }
