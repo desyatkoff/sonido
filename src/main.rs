@@ -1,72 +1,45 @@
 /*
-Copyright (C) 2025 Desyatkov Sergey
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version
-*/
+ * This file is part of Sonido
+ *
+ * Copyright (C) 2026 Sergey Desyatkov
+ *
+ * Sonido is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published
+ * by the Free Software Foundation, either version 3 of the License,
+ * or (at your option) any later version
+ *
+ * Sonido is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Sonido. If not, see <https://www.gnu.org/licenses/>
+ */
 
-use std::{
-    env,
-    path::{
-        Path,
-        PathBuf,
-    },
-    time::{
-        Duration,
-        Instant,
-    }
-};
 use anyhow::Result;
 use crossterm::{
-    event::{
-        self,
-        Event,
-        KeyCode,
-        KeyEventKind,
-    },
+    event::{self, Event, KeyCode, KeyEventKind},
     execute,
-    terminal::{
-        disable_raw_mode,
-        enable_raw_mode,
-        EnterAlternateScreen,
-        LeaveAlternateScreen,
-    },
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use directories::ProjectDirs;
-use lofty::{
-    read_from_path,
-    file::AudioFile,
-    file::TaggedFileExt,
-    tag::Accessor,
-};
+use lofty::{file::AudioFile, file::TaggedFileExt, read_from_path, tag::Accessor};
 use ratatui::{
+    Frame,
     prelude::*,
     symbols::border,
     widgets::{
-        Block,
-        Borders,
-        Gauge,
-        List,
-        ListItem,
-        ListState,
-        Paragraph,
-        Scrollbar,
-        ScrollbarOrientation,
-        ScrollbarState,
-        Wrap,
+        Block, Borders, Gauge, List, ListItem, ListState, Paragraph, Scrollbar,
+        ScrollbarOrientation, ScrollbarState, Wrap,
     },
-    Frame,
 };
-use rodio::{
-    Decoder,
-    OutputStream,
-    Sink,
-    Source,
-};
-use serde::{
-    Deserialize,
-    Serialize,
+use rodio::{Decoder, OutputStream, Sink, Source};
+use serde::{Deserialize, Serialize};
+use std::{
+    env,
+    path::{Path, PathBuf},
+    time::{Duration, Instant},
 };
 use walkdir::WalkDir;
 
@@ -83,12 +56,12 @@ struct Metadata {
     title: Option<String>,
     artist: Option<String>,
     album: Option<String>,
-    year: Option<String>,
     genre: Option<String>,
     track_number: Option<u32>,
-    bitrate: Option<u32>,
+    release_year: Option<String>,
+    duration: Option<Duration>,
     sample_rate: Option<u32>,
-    channels: Option<u8>,
+    bitrate: Option<u32>,
 }
 
 impl Metadata {
@@ -105,21 +78,19 @@ impl Metadata {
             let tag = tagged_file
                 .primary_tag()
                 .or_else(|| tagged_file.first_tag());
+            let props = tagged_file.properties();
 
             if let Some(tag) = tag {
                 metadata.title = tag.title().map(|s| s.to_string());
                 metadata.artist = tag.artist().map(|s| s.to_string());
                 metadata.album = tag.album().map(|s| s.to_string());
-                metadata.year = tag.year().map(|y| y.to_string());
                 metadata.genre = tag.genre().map(|s| s.to_string());
                 metadata.track_number = tag.track();
+                metadata.release_year = tag.year().map(|y| y.to_string());
+                metadata.duration = Some(props.duration());
+                metadata.sample_rate = props.sample_rate();
+                metadata.bitrate = props.audio_bitrate();
             }
-
-            let properties = tagged_file.properties();
-
-            metadata.bitrate = properties.audio_bitrate();
-            metadata.sample_rate = properties.sample_rate();
-            metadata.channels = properties.channels();
         }
 
         if metadata.title.is_none() {
@@ -131,7 +102,7 @@ impl Metadata {
             }
         }
 
-        return metadata;
+        metadata
     }
 }
 
@@ -251,16 +222,16 @@ OPTIONS:
     } else if version {
         println!(
             r#"
- ____              _     _       
-/ ___|  ___  _ __ (_) __| | ___  
-\___ \ / _ \| '_ \| |/ _` |/ _ \ 
+ ____              _     _
+/ ___|  ___  _ __ (_) __| | ___
+\___ \ / _ \| '_ \| |/ _` |/ _ \
  ___) | (_) | | | | | (_| | (_) |
 |____/ \___/|_| |_|_|\__,_|\___/
 
 Sonido v{}
 A sleek, terminal-based music player written in Rust
 
-Copyright (C) 2025 Desyatkov Sergey
+Copyright (C) 2026 Desyatkov Sergey
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
@@ -306,7 +277,7 @@ the Free Software Foundation, either version 3 of the License, or
     execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
     terminal.show_cursor()?;
 
-    return result;
+    result
 }
 
 fn parse_args(args: &[String]) -> (bool, bool, bool, PathBuf) {
@@ -319,14 +290,14 @@ fn parse_args(args: &[String]) -> (bool, bool, bool, PathBuf) {
         match arg.as_str() {
             "-h" | "--help" => {
                 help = true;
-            },
+            }
             "-r" | "--recursive" => {
                 recursive = true;
-            },
+            }
             "-V" | "--version" => {
                 version = true;
             }
-            _ if arg.starts_with('-') => {},
+            _ if arg.starts_with('-') => {}
             _ => {
                 if music_directory.is_none() {
                     music_directory = Some(PathBuf::from(arg));
@@ -337,140 +308,59 @@ fn parse_args(args: &[String]) -> (bool, bool, bool, PathBuf) {
 
     let music_directory = music_directory.unwrap_or_else(|| env::current_dir().unwrap());
 
-    return (help, recursive, version, music_directory);
+    (help, recursive, version, music_directory)
 }
 
 fn parse_key(key_str: &str) -> KeyCode {
     match key_str.to_lowercase().as_str() {
-        "space" => {
-            return KeyCode::Char(' ');
-        },
-        "left" => {
-            return KeyCode::Left;
-        },
-        "right" => {
-            return KeyCode::Right;
-        },
-        "up" => {
-            return KeyCode::Up;
-        },
-        "down" => {
-            return KeyCode::Down;
-        },
-        "escape" | "esc" => {
-            return KeyCode::Esc;
-        },
-        "tab" => {
-            return KeyCode::Tab;
-        },
-        "backspace" => {
-            return KeyCode::Backspace;
-        },
-        "enter" => {
-            return KeyCode::Enter;
-        },
-        "insert" | "ins" => {
-            return KeyCode::Insert;
-        },
-        "delete" | "del" => {
-            return KeyCode::Delete;
-        },
-        "home" => {
-            return KeyCode::Home;
-        },
-        "end" => {
-            return KeyCode::End;
-        },
-        "pageup" | "pgup" => {
-            return KeyCode::PageUp;
-        },
-        "pagedown" | "pgdown" => {
-            return KeyCode::PageDown;
-        },
-        key if key.len() == 1 => {
-            return KeyCode::Char(
-                key
-                    .chars()
-                    .next()
-                    .unwrap()
-            );
-        },
-        _ => {
-            return KeyCode::Null;
-        },
+        "space" => KeyCode::Char(' '),
+        "left" => KeyCode::Left,
+        "right" => KeyCode::Right,
+        "up" => KeyCode::Up,
+        "down" => KeyCode::Down,
+        "escape" | "esc" => KeyCode::Esc,
+        "tab" => KeyCode::Tab,
+        "backspace" => KeyCode::Backspace,
+        "enter" => KeyCode::Enter,
+        "insert" | "ins" => KeyCode::Insert,
+        "delete" | "del" => KeyCode::Delete,
+        "home" => KeyCode::Home,
+        "end" => KeyCode::End,
+        "pageup" | "pgup" => KeyCode::PageUp,
+        "pagedown" | "pgdown" => KeyCode::PageDown,
+        key if key.len() == 1 => KeyCode::Char(key.chars().next().unwrap()),
+        _ => KeyCode::Null,
     }
 }
 
 fn parse_alignment(alignment_str: &str) -> Alignment {
     match alignment_str.to_lowercase().as_str() {
-        "left" => {
-            return Alignment::Left;
-        },
-        "center" => {
-            return Alignment::Center;
-        },
-        "right" => {
-            return Alignment::Right;
-        },
-        _ => {
-            return Alignment::Left;
-        }
+        "left" => Alignment::Left,
+        "center" => Alignment::Center,
+        "right" => Alignment::Right,
+        _ => Alignment::Left,
     }
 }
 
 fn parse_color(color_str: &str) -> Color {
     match color_str.to_lowercase().as_str() {
-        "black" => {
-            return Color::Black;
-        },
-        "red" => {
-            return Color::Red;
-        },
-        "green" => {
-            return Color::Green;
-        },
-        "yellow" => {
-            return Color::Yellow;
-        },
-        "blue" => {
-            return Color::Blue;
-        },
-        "magenta" => {
-            return Color::Magenta;
-        },
-        "cyan" => {
-            return Color::Cyan;
-        },
-        "gray" | "grey" => {
-            return Color::Gray;
-        },
-        "darkgray" | "darkgrey" => {
-            return Color::DarkGray;
-        },
-        "lightred" => {
-            return Color::LightRed;
-        },
-        "lightgreen" => {
-            return Color::LightGreen;
-        },
-        "lightyellow" => {
-            return Color::LightYellow;
-        },
-        "lightblue" => {
-            return Color::LightBlue;
-        },
-        "lightmagenta" => {
-            return Color::LightMagenta;
-        },
-        "lightcyan" => {
-            return Color::LightCyan;
-        },
-        "white" => {
-            return Color::White;
-        },
-        _ => {
-            return Color::Blue;
-        },
+        "black" => Color::Black,
+        "red" => Color::Red,
+        "green" => Color::Green,
+        "yellow" => Color::Yellow,
+        "blue" => Color::Blue,
+        "magenta" => Color::Magenta,
+        "cyan" => Color::Cyan,
+        "gray" | "grey" => Color::Gray,
+        "darkgray" | "darkgrey" => Color::DarkGray,
+        "lightred" => Color::LightRed,
+        "lightgreen" => Color::LightGreen,
+        "lightyellow" => Color::LightYellow,
+        "lightblue" => Color::LightBlue,
+        "lightmagenta" => Color::LightMagenta,
+        "lightcyan" => Color::LightCyan,
+        "white" => Color::White,
+        _ => Color::Blue,
     }
 }
 
@@ -481,33 +371,34 @@ fn load_config() -> ConfigSettings {
 
         if let Ok(contents) = std::fs::read_to_string(&config_path) {
             match toml::from_str::<Config>(&contents) {
-                Ok(config) => {
-                    return config.config;
-                },
-                Err(e) => {
-                    return ConfigSettings::default();
-                }
+                Ok(config) => config.config,
+                Err(_) => ConfigSettings::default(),
             }
         } else {
             let default_config = ConfigSettings::default();
 
-            std::fs::create_dir_all(config_directory);
+            let _ = std::fs::create_dir_all(config_directory);
 
-            match toml::to_string(&Config { config: default_config.clone() }) {
+            match toml::to_string(&Config {
+                config: default_config.clone(),
+            }) {
                 Ok(toml_str) => {
-                    std::fs::write(&config_path, toml_str);
-                },
-                Err(_) => {},
+                    let _ = std::fs::write(&config_path, toml_str);
+                }
+                Err(_) => {}
             }
 
-            return default_config;
+            default_config
         }
     } else {
-        return ConfigSettings::default();
+        ConfigSettings::default()
     }
 }
 
-fn run_app(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>, app: &mut App) -> Result<()> {
+fn run_app(
+    terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
+    app: &mut App,
+) -> Result<()> {
     loop {
         terminal.draw(|f| ui(f, app))?;
 
@@ -517,38 +408,40 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>, app: &mut
                     match key.code {
                         _ if key.code == parse_key(&app.config.quit) => {
                             return Ok(());
-                        },
+                        }
                         _ if key.code == parse_key(&app.config.toggle_playback) => {
                             toggle_playback(app);
-                        },
+                        }
                         _ if key.code == parse_key(&app.config.toggle_repeat) => {
                             toggle_repeat(app);
-                        },
+                        }
                         _ if key.code == parse_key(&app.config.seek_backward) => {
                             seek(app, -(app.config.seek_step as i64));
-                        },
+                        }
                         _ if key.code == parse_key(&app.config.seek_forward) => {
                             seek(app, app.config.seek_step as i64);
-                        },
+                        }
                         _ if key.code == parse_key(&app.config.previous_track) => {
                             next_track(app, -1);
-                        },
+                        }
                         _ if key.code == parse_key(&app.config.next_track) => {
                             next_track(app, 1);
-                        },
+                        }
                         _ if key.code == parse_key(&app.config.hide_track) => {
                             hide_track(app, app.current_track);
-                        },
+                        }
                         _ if key.code == parse_key(&app.config.reload_config) => {
                             app.config = load_config();
-                        },
-                        _ => {},
+                        }
+                        _ => {}
                     }
                 }
             }
         }
 
-        if let (PlaybackState::Playing, Some(start_time)) = (&app.playback_state, app.playback_start) {
+        if let (PlaybackState::Playing, Some(start_time)) =
+            (&app.playback_state, app.playback_start)
+        {
             app.position = start_time.elapsed();
 
             if app.position >= app.tracks[app.current_track].duration {
@@ -566,7 +459,11 @@ fn ui(f: &mut Frame, app: &App) {
     let show_metadata_panel = app.config.show_metadata_panel;
     let show_progress_title = app.config.show_progress_title;
 
-    let app_title_format = app.config.app_title_format.clone().replace("{VERSION}", VERSION);
+    let app_title_format = app
+        .config
+        .app_title_format
+        .clone()
+        .replace("{VERSION}", VERSION);
     let playlist_title_format = app.config.playlist_title_format.clone();
     let metadata_title_format = app.config.metadata_title_format.clone();
     let progress_title_format = app.config.progress_title_format.clone();
@@ -607,10 +504,7 @@ fn ui(f: &mut Frame, app: &App) {
     let center_layout = if show_metadata_panel {
         Layout::default()
             .direction(Direction::Horizontal)
-            .constraints([
-                Constraint::Percentage(50),
-                Constraint::Percentage(50),
-            ])
+            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
             .split(layout[1])
     } else {
         Layout::default()
@@ -633,27 +527,22 @@ fn ui(f: &mut Frame, app: &App) {
         .iter()
         .enumerate()
         .map(|(i, track)| {
-            let display_name = track
-                .metadata
-                .title
-                .as_ref()
-                .cloned()
-                .unwrap_or_else(|| {
-                    track
-                        .path
-                        .file_stem()
-                        .and_then(|n| n.to_str())
-                        .unwrap_or("Unknown")
-                        .to_string()
-                });
-            
+            let display_name = track.metadata.title.as_ref().cloned().unwrap_or_else(|| {
+                track
+                    .path
+                    .file_stem()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("Unknown")
+                    .to_string()
+            });
+
             let style = if i == app.current_track {
                 Style::default().fg(playlist_color)
             } else {
                 Style::default()
             };
-            
-            return ListItem::new(display_name).style(style);
+
+            ListItem::new(display_name).style(style)
         })
         .collect();
 
@@ -674,7 +563,7 @@ fn ui(f: &mut Frame, app: &App) {
                 Block::default()
                     .borders(Borders::ALL)
                     .border_set(border_set)
-                    .border_style(Style::default().fg(playlist_color))
+                    .border_style(Style::default().fg(playlist_color)),
             )
             .highlight_style(Style::default().bold())
     };
@@ -697,91 +586,75 @@ fn ui(f: &mut Frame, app: &App) {
                 width: 1,
                 height: center_layout[0].height.saturating_sub(2),
             },
-            &mut scrollbar_state
+            &mut scrollbar_state,
         );
     }
 
     let metadata = &track.metadata;
-    
-    let mut lines = vec![
+
+    let lines = vec![
         Line::from(vec![
-            Span::styled("Title: ", Style::default().fg(metadata_color)),
+            Span::styled("Title", Style::default().fg(metadata_color)),
+            Span::raw(": "),
+            Span::raw(metadata.title.as_deref().unwrap_or("Unknown")),
+        ]),
+        Line::from(vec![
+            Span::styled("Artist", Style::default().fg(metadata_color)),
+            Span::raw(": "),
+            Span::raw(metadata.artist.as_deref().unwrap_or("Unknown")),
+        ]),
+        Line::from(vec![
+            Span::styled("Album", Style::default().fg(metadata_color)),
+            Span::raw(": "),
+            Span::raw(metadata.album.as_deref().unwrap_or("Unknown")),
+        ]),
+        Line::from(vec![
+            Span::styled("Genre", Style::default().fg(metadata_color)),
+            Span::raw(": "),
+            Span::raw(metadata.genre.as_deref().unwrap_or("Unknown")),
+        ]),
+        Line::from(vec![
+            Span::styled("Track Number", Style::default().fg(metadata_color)),
+            Span::raw(": "),
             Span::raw(
                 metadata
-                    .title
-                    .as_deref()
-                    .unwrap_or("Unknown")
+                    .track_number
+                    .map_or("Unknown".to_string(), |v| v.to_string()),
             ),
         ]),
         Line::from(vec![
-            Span::styled("Artist: ", Style::default().fg(metadata_color)),
+            Span::styled("Release Year", Style::default().fg(metadata_color)),
+            Span::raw(": "),
+            Span::raw(metadata.release_year.as_deref().unwrap_or("Unknown")),
+        ]),
+        Line::from(vec![
+            Span::styled("Duration", Style::default().fg(metadata_color)),
+            Span::raw(": "),
             Span::raw(
                 metadata
-                    .artist
-                    .as_deref()
-                    .unwrap_or("Unknown")
+                    .duration
+                    .map_or("Unknown".to_string(), |v| format_duration(v)),
             ),
         ]),
         Line::from(vec![
-            Span::styled("Duration: ", Style::default().fg(metadata_color)),
-            Span::raw(format_duration(track.duration)),
+            Span::styled("Sample Rate", Style::default().fg(metadata_color)),
+            Span::raw(": "),
+            Span::raw(
+                metadata
+                    .sample_rate
+                    .map_or("Unknown".to_string(), |v| format!("{v} Hz")),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled("Bitrate", Style::default().fg(metadata_color)),
+            Span::raw(": "),
+            Span::raw(
+                metadata
+                    .bitrate
+                    .map_or("Unknown".to_string(), |v| format!("{v} kbps")),
+            ),
         ]),
     ];
-    
-    if let Some(album) = &metadata.album {
-        lines.push(Line::from(vec![
-            Span::styled("Album: ", Style::default().fg(metadata_color)),
-            Span::raw(album),
-        ]));
-    }
-    
-    if let Some(year) = &metadata.year {
-        lines.push(Line::from(vec![
-            Span::styled("Year: ", Style::default().fg(metadata_color)),
-            Span::raw(year),
-        ]));
-    }
-    
-    if let Some(genre) = &metadata.genre {
-        lines.push(Line::from(vec![
-            Span::styled("Genre: ", Style::default().fg(metadata_color)),
-            Span::raw(genre),
-        ]));
-    }
-    
-    if let Some(track_num) = metadata.track_number {
-        lines.push(Line::from(vec![
-            Span::styled("Track: ", Style::default().fg(metadata_color)),
-            Span::raw(track_num.to_string()),
-        ]));
-    }
-
-    if let Some(bitrate) = metadata.bitrate {
-        lines.push(Line::from(vec![
-            Span::styled("Bitrate: ", Style::default().fg(metadata_color)),
-            Span::raw(format!("{} kbps", bitrate)),
-        ]));
-    }
-
-    if let Some(sample_rate) = metadata.sample_rate {
-        lines.push(Line::from(vec![
-            Span::styled("Sample Rate: ", Style::default().fg(metadata_color)),
-            Span::raw(format!("{} Hz", sample_rate)),
-        ]));
-    }
-
-    if let Some(channels) = metadata.channels {
-        let channel_str = match channels {
-            1 => "Mono".to_string(),
-            2 => "Stereo".to_string(),
-            n => format!("{} channels", n),
-        };
-
-        lines.push(Line::from(vec![
-            Span::styled("Channels: ", Style::default().fg(metadata_color)),
-            Span::raw(channel_str),
-        ]));
-    }
 
     let metadata_block = if show_metadata_title {
         Block::default()
@@ -844,16 +717,7 @@ fn ui(f: &mut Frame, app: &App) {
 
 fn scan_music_files(dir: &Path, recursive: bool) -> Result<Vec<Track>> {
     let mut tracks = Vec::new();
-    let extensions = [
-        "mp3",
-        "aac",
-        "wav",
-        "flac",
-        "alac",
-        "aiff",
-        "aif",
-        "m4a"
-    ];
+    let extensions = ["mp3", "aac", "wav", "flac", "alac", "aiff", "aif", "m4a"];
 
     let walker = if recursive {
         WalkDir::new(dir).into_iter()
@@ -880,45 +744,25 @@ fn scan_music_files(dir: &Path, recursive: bool) -> Result<Vec<Track>> {
         }
     }
 
-    tracks.sort_by(
-        |a, b| {
-            let a_title = a
-                .metadata
-                .title
-                .as_deref()
-                .unwrap_or("")
-                .to_lowercase();
-            let b_title = b
-                .metadata
-                .title
-                .as_deref()
-                .unwrap_or("")
-                .to_lowercase();
+    tracks.sort_by(|a, b| {
+        let a_title = a.metadata.title.as_deref().unwrap_or("").to_lowercase();
+        let b_title = b.metadata.title.as_deref().unwrap_or("").to_lowercase();
 
-            return a_title.cmp(&b_title);
-        }
-    );
+        a_title.cmp(&b_title)
+    });
 
-    return Ok(tracks);
+    Ok(tracks)
 }
 
 fn get_audio_duration(path: &Path) -> Result<Duration> {
     let file = std::fs::File::open(path)?;
     let source = Decoder::new(std::io::BufReader::new(file))?;
 
-    return Ok(
-        source
-            .total_duration()
-            .unwrap_or(Duration::ZERO)
-    );
+    Ok(source.total_duration().unwrap_or(Duration::ZERO))
 }
 
 fn format_duration(d: Duration) -> String {
-    return format!(
-        "{}:{:02}",
-        d.as_secs() / 60,
-        d.as_secs() % 60
-    );
+    format!("{}:{:02}", d.as_secs() / 60, d.as_secs() % 60)
 }
 
 fn toggle_playback(app: &mut App) {
@@ -930,7 +774,7 @@ fn toggle_playback(app: &mut App) {
 
             app.playback_state = PlaybackState::Paused;
             app.playback_start = None;
-        },
+        }
         PlaybackState::Paused => {
             if let Some(sink) = &app.sink {
                 sink.play();
@@ -938,7 +782,7 @@ fn toggle_playback(app: &mut App) {
 
             app.playback_state = PlaybackState::Playing;
             app.playback_start = Some(Instant::now() - app.position);
-        },
+        }
         PlaybackState::Stopped => {
             play_track(app);
         }
@@ -946,11 +790,7 @@ fn toggle_playback(app: &mut App) {
 }
 
 fn toggle_repeat(app: &mut App) {
-    app.repeat_mode = if app.repeat_mode {
-        false
-    } else {
-        true
-    };
+    app.repeat_mode = if app.repeat_mode { false } else { true };
 }
 
 fn seek(app: &mut App, seconds: i64) {
