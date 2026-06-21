@@ -388,13 +388,10 @@ fn load_config() -> ConfigSettings {
 
             let _ = std::fs::create_dir_all(config_directory);
 
-            match toml::to_string(&Config {
+            if let Ok(toml_str) = toml::to_string(&Config {
                 config: default_config.clone(),
             }) {
-                Ok(toml_str) => {
-                    let _ = std::fs::write(&config_path, toml_str);
-                }
-                Err(_) => {}
+                let _ = std::fs::write(&config_path, toml_str);
             }
 
             default_config
@@ -411,43 +408,42 @@ fn run_app(
     loop {
         terminal.draw(|f| ui(f, app))?;
 
-        if event::poll(Duration::from_millis(50))? {
-            if let Event::Key(key) = event::read()? {
-                if key.kind == KeyEventKind::Press {
-                    match key.code {
-                        _ if key.code == parse_key(&app.config.quit) => {
-                            return Ok(());
-                        }
-                        _ if key.code == parse_key(&app.config.toggle_playback) => {
-                            toggle_playback(app);
-                        }
-                        _ if key.code == parse_key(&app.config.toggle_repeat) => {
-                            toggle_repeat(app);
-                        }
-                        _ if key.code == parse_key(&app.config.seek_backward) => {
-                            seek(app, -(app.config.seek_step as i64));
-                        }
-                        _ if key.code == parse_key(&app.config.seek_forward) => {
-                            seek(app, app.config.seek_step as i64);
-                        }
-                        _ if key.code == parse_key(&app.config.previous_track) => {
-                            next_track(app, -1);
-                        }
-                        _ if key.code == parse_key(&app.config.next_track) => {
-                            next_track(app, 1);
-                        }
-                        _ if key.code == parse_key(&app.config.hide_track) => {
-                            hide_track(app, app.current_track);
-                        }
-                        _ if key.code == parse_key(&app.config.toggle_metadata_panel) => {
-                            app.config.show_metadata_panel = !app.config.show_metadata_panel;
-                        }
-                        _ if key.code == parse_key(&app.config.reload_config) => {
-                            app.config = load_config();
-                        }
-                        _ => {}
-                    }
+        if event::poll(Duration::from_millis(50))?
+            && let Event::Key(key) = event::read()?
+            && key.kind == KeyEventKind::Press
+        {
+            match key.code {
+                _ if key.code == parse_key(&app.config.quit) => {
+                    return Ok(());
                 }
+                _ if key.code == parse_key(&app.config.toggle_playback) => {
+                    toggle_playback(app);
+                }
+                _ if key.code == parse_key(&app.config.toggle_repeat) => {
+                    toggle_repeat(app);
+                }
+                _ if key.code == parse_key(&app.config.seek_backward) => {
+                    seek(app, -(app.config.seek_step as i64));
+                }
+                _ if key.code == parse_key(&app.config.seek_forward) => {
+                    seek(app, app.config.seek_step as i64);
+                }
+                _ if key.code == parse_key(&app.config.previous_track) => {
+                    next_track(app, -1);
+                }
+                _ if key.code == parse_key(&app.config.next_track) => {
+                    next_track(app, 1);
+                }
+                _ if key.code == parse_key(&app.config.hide_track) => {
+                    hide_track(app, app.current_track);
+                }
+                _ if key.code == parse_key(&app.config.toggle_metadata_panel) => {
+                    app.config.show_metadata_panel = !app.config.show_metadata_panel;
+                }
+                _ if key.code == parse_key(&app.config.reload_config) => {
+                    app.config = load_config();
+                }
+                _ => {}
             }
         }
 
@@ -645,7 +641,7 @@ fn ui(f: &mut Frame, app: &App) {
             Span::raw(
                 metadata
                     .duration
-                    .map_or("Unknown".to_string(), |v| format_duration(v)),
+                    .map_or("Unknown".to_string(), format_duration),
             ),
         ]),
         Line::from(vec![
@@ -740,19 +736,18 @@ fn scan_music_files(dir: &Path, recursive: bool) -> Result<Vec<Track>, Box<dyn E
     for entry in walker.filter_map(|e| e.ok()) {
         let path = entry.path();
 
-        if path.is_file() {
-            if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-                if extensions.contains(&ext.to_lowercase().as_str()) {
-                    let duration = get_audio_duration(path).unwrap_or(Duration::ZERO);
-                    let metadata = Metadata::from_path(path);
+        if path.is_file()
+            && let Some(ext) = path.extension().and_then(|e| e.to_str())
+            && extensions.contains(&ext.to_lowercase().as_str())
+        {
+            let duration = get_audio_duration(path).unwrap_or(Duration::ZERO);
+            let metadata = Metadata::from_path(path);
 
-                    tracks.push(Track {
-                        path: path.to_path_buf(),
-                        duration,
-                        metadata,
-                    });
-                }
-            }
+            tracks.push(Track {
+                path: path.to_path_buf(),
+                duration,
+                metadata,
+            });
         }
     }
 
@@ -802,7 +797,7 @@ fn toggle_playback(app: &mut App) {
 }
 
 fn toggle_repeat(app: &mut App) {
-    app.repeat_mode = if app.repeat_mode { false } else { true };
+    app.repeat_mode = !app.repeat_mode;
 }
 
 fn seek(app: &mut App, seconds: i64) {
@@ -815,13 +810,13 @@ fn seek(app: &mut App, seconds: i64) {
     if let (Some(sink), PlaybackState::Playing) = (&app.sink, &app.playback_state) {
         sink.stop();
 
-        if let Ok(file) = std::fs::File::open(&app.tracks[app.current_track].path) {
-            if let Ok(mut source) = Decoder::new(std::io::BufReader::new(file)) {
-                source.try_seek(app.position).ok();
-                sink.append(source);
+        if let Ok(file) = std::fs::File::open(&app.tracks[app.current_track].path)
+            && let Ok(mut source) = Decoder::new(std::io::BufReader::new(file))
+        {
+            source.try_seek(app.position).ok();
+            sink.append(source);
 
-                app.playback_start = Some(Instant::now() - app.position);
-            }
+            app.playback_start = Some(Instant::now() - app.position);
         }
     } else if let Some(playback_start) = app.playback_start {
         app.playback_start = Some(playback_start);
@@ -829,21 +824,20 @@ fn seek(app: &mut App, seconds: i64) {
 }
 
 fn play_track(app: &mut App) {
-    if let Ok((stream, handle)) = OutputStream::try_default() {
-        if let Ok(file) = std::fs::File::open(&app.tracks[app.current_track].path) {
-            if let Ok(source) = Decoder::new(std::io::BufReader::new(file)) {
-                let sink = Sink::try_new(&handle).unwrap();
+    if let Ok((stream, handle)) = OutputStream::try_default()
+        && let Ok(file) = std::fs::File::open(&app.tracks[app.current_track].path)
+        && let Ok(source) = Decoder::new(std::io::BufReader::new(file))
+    {
+        let sink = Sink::try_new(&handle).unwrap();
 
-                sink.append(source);
-                app.position = Duration::ZERO;
-                app.playback_start = Some(Instant::now());
-                app.sink = Some(sink);
-                app._stream = Some(stream);
-                app.playback_state = PlaybackState::Playing;
+        sink.append(source);
+        app.position = Duration::ZERO;
+        app.playback_start = Some(Instant::now());
+        app.sink = Some(sink);
+        app._stream = Some(stream);
+        app.playback_state = PlaybackState::Playing;
 
-                return;
-            }
-        }
+        return;
     }
 
     app.playback_state = PlaybackState::Stopped;
