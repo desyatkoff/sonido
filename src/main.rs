@@ -224,8 +224,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     if tracks.is_empty() {
         eprintln!(
-            "{}: no music files found in {}",
-            Colorize::red("error").bold(),
+            "{} no music files found in {}",
+            Colorize::red("error:").bold(),
             args.path.display()
         );
 
