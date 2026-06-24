@@ -22,6 +22,7 @@ A sleek, terminal-based music player written in Rust
 ## Features
 
 * Play local audio files
+* Search tracks by title
 * Lightweight & fast
 * Navigate with only keyboard needed
 * Simple controls
@@ -40,6 +41,7 @@ By default, the controls are:
 * `J`/`↓` -> Go to next track
 * `X` -> Hide current track from playlist
 * `M` -> Toggle metadata panel
+* `/`/`S` -> Search
 * `C` -> Reload config
 * `Q` -> Quit
 
@@ -71,6 +73,7 @@ previous_track = ["k", "up"]
 next_track = ["j", "down"]
 hide_track = ["x"]
 toggle_metadata_panel = ["m"]
+search = ["/", "s"]
 reload_config = ["c"]
 quit = ["q"]
 show_app_title = true
@@ -79,18 +82,22 @@ show_playlist_scrollbar = true
 show_metadata_title = true
 show_metadata_panel = true
 show_progress_title = false
+show_search_title = true
 app_title_format = "┤ Sonido v{VERSION} ├"
 playlist_title_format = "┤ Playlist ├"
 metadata_title_format = "┤ Metadata ├"
 progress_title_format = "┤ Progress ├"
+search_title_format = "┤ Search ├"
 app_title_alignment = "center"
 playlist_title_alignment = "left"
 metadata_title_alignment = "left"
 progress_title_alignment = "left"
+search_title_alignment = "left"
 app_title_color = "blue"
 playlist_color = "blue"
 metadata_color = "blue"
 progress_color = "blue"
+search_color = "blue"
 rounded_corners = true
 ```
 
