@@ -84,7 +84,7 @@ show_metadata_panel = true
 show_progress_title = false
 show_search_title = true
 app_title_format = "┤ Sonido v{VERSION} ├"
-playlist_title_format = "┤ Playlist ├"
+playlist_title_format = "┤ Playlist │ {PLAYLIST_PROGRESS} ├"
 metadata_title_format = "┤ Metadata ├"
 progress_title_format = "┤ Progress ├"
 search_title_format = "┤ Search ├"
@@ -101,7 +101,11 @@ search_color = "blue"
 rounded_corners = true
 ```
 
-Note that in the `app_title_format` setting, the placeholder `{VERSION}` will be replaced with current app version installed. Press `reload_config` key or restart Sonido after editing to apply changes. Everything is simple and intuitive, so it's not necessary to write a whole guide on it
+For `app_title_format` setting, the placeholder `{VERSION}` will be replaced with current app version installed
+
+For `playlist_title_format` setting, the placeholder `{PLAYLIST_PROGRESS}` will be replaced with number of current track and total tracks count (for example: `4 / 20`)
+
+Press `reload_config` key or restart Sonido after editing to apply changes. Everything is simple and intuitive, so it's not necessary to write a whole guide on it
 
 Config presets you can find [here](assets/configs/) or simply make your own one
 
