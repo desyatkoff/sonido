@@ -205,7 +205,7 @@ impl Default for ConfigSettings {
             show_progress_title: false,
             show_search_title: true,
             app_title_format: "┤ Sonido v{VERSION} ├".into(),
-            playlist_title_format: "┤ Playlist ├".into(),
+            playlist_title_format: "┤ Playlist │ {PLAYLIST_PROGRESS} ├".into(),
             metadata_title_format: "┤ Metadata ├".into(),
             progress_title_format: "┤ Progress ├".into(),
             search_title_format: "┤ Search ├".into(),
@@ -490,7 +490,10 @@ fn ui(f: &mut Frame, app: &mut App) {
         .app_title_format
         .clone()
         .replace("{VERSION}", VERSION);
-    let playlist_title_format = app.config.playlist_title_format.clone();
+    let playlist_title_format = app.config.playlist_title_format.clone().replace(
+        "{PLAYLIST_PROGRESS}",
+        &format!("{} / {}", app.current_track + 1, app.tracks.len()),
+    );
     let metadata_title_format = app.config.metadata_title_format.clone();
     let progress_title_format = app.config.progress_title_format.clone();
     let search_title_format = app.config.search_title_format.clone();
