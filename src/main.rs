@@ -31,7 +31,7 @@ use ratatui::{
     prelude::*,
     symbols::border,
     widgets::{
-        Block, Borders, Gauge, List, ListItem, ListState, Paragraph, Scrollbar,
+        Block, Borders, Clear, Gauge, List, ListItem, ListState, Paragraph, Scrollbar,
         ScrollbarOrientation, ScrollbarState, Wrap,
     },
 };
@@ -154,6 +154,7 @@ struct ConfigSettings {
     next_track: Vec<String>,
     hide_track: Vec<String>,
     toggle_metadata_panel: Vec<String>,
+    search: Vec<String>,
     reload_config: Vec<String>,
     quit: Vec<String>,
     show_app_title: bool,
@@ -162,18 +163,22 @@ struct ConfigSettings {
     show_metadata_title: bool,
     show_metadata_panel: bool,
     show_progress_title: bool,
+    show_search_title: bool,
     app_title_format: String,
     playlist_title_format: String,
     metadata_title_format: String,
     progress_title_format: String,
+    search_title_format: String,
     app_title_alignment: String,
     playlist_title_alignment: String,
     metadata_title_alignment: String,
     progress_title_alignment: String,
+    search_title_alignment: String,
     app_title_color: String,
     playlist_color: String,
     metadata_color: String,
     progress_color: String,
+    search_color: String,
     rounded_corners: bool,
 }
 
@@ -189,6 +194,7 @@ impl Default for ConfigSettings {
             next_track: vec!["j".to_string(), "down".to_string()],
             hide_track: vec!["x".to_string()],
             toggle_metadata_panel: vec!["m".to_string()],
+            search: vec!["/".to_string(), "s".to_string()],
             reload_config: vec!["c".to_string()],
             quit: vec!["q".to_string()],
             show_app_title: true,
@@ -197,24 +203,29 @@ impl Default for ConfigSettings {
             show_metadata_title: true,
             show_metadata_panel: true,
             show_progress_title: false,
+            show_search_title: true,
             app_title_format: "┤ Sonido v{VERSION} ├".into(),
             playlist_title_format: "┤ Playlist ├".into(),
             metadata_title_format: "┤ Metadata ├".into(),
             progress_title_format: "┤ Progress ├".into(),
+            search_title_format: "┤ Search ├".into(),
             app_title_alignment: "center".into(),
             playlist_title_alignment: "left".into(),
             metadata_title_alignment: "left".into(),
             progress_title_alignment: "left".into(),
+            search_title_alignment: "left".into(),
             app_title_color: "blue".into(),
             metadata_color: "blue".into(),
             playlist_color: "blue".into(),
             progress_color: "blue".into(),
+            search_color: "blue".into(),
             rounded_corners: true,
         }
     }
 }
 
 struct App {
+    args: Args,
     tracks: Vec<Track>,
     config: ConfigSettings,
     current_track: usize,
@@ -226,6 +237,8 @@ struct App {
     sink: Option<Sink>,
     _stream: Option<OutputStream>,
     scroll_state: ScrollbarState,
+    search_mode: bool,
+    search_input: String,
 }
 
 enum PlaybackState {
@@ -237,20 +250,7 @@ enum PlaybackState {
 fn main() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
 
-    let tracks = if args.playlist.is_some() {
-        let playlist_path = match args.playlist.as_deref() {
-            Some("") => ProjectDirs::from("", "", "sonido")
-                .unwrap()
-                .config_dir()
-                .join("playlist.txt"),
-            Some(path) => PathBuf::from(path),
-            None => PathBuf::new(),
-        };
-
-        scan_playlist_file(playlist_path, args.recursive, args.sort)?
-    } else {
-        scan_music_files(args.path, args.recursive, args.sort)?
-    };
+    let tracks = scan_tracks(None, &args)?;
 
     if tracks.is_empty() {
         eprintln!(
@@ -271,6 +271,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let tracks_count = tracks.len();
 
     let mut app = App {
+        args,
         tracks,
         config,
         current_track: 0,
@@ -282,6 +283,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         sink: None,
         _stream: None,
         scroll_state: ScrollbarState::new(tracks_count),
+        search_mode: false,
+        search_input: String::new(),
     };
 
     let result = run_app(&mut terminal, &mut app);
@@ -296,7 +299,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 fn parse_key(key_str: &str) -> KeyCode {
     match key_str.to_lowercase().as_str() {
-        "space" => KeyCode::Char(' '),
+        "space" | " " => KeyCode::Char(' '),
         "left" => KeyCode::Left,
         "right" => KeyCode::Right,
         "up" => KeyCode::Up,
@@ -311,6 +314,7 @@ fn parse_key(key_str: &str) -> KeyCode {
         "end" => KeyCode::End,
         "pageup" | "pgup" => KeyCode::PageUp,
         "pagedown" | "pgdown" => KeyCode::PageDown,
+        "slash" | "/" => KeyCode::Char('/'),
         key if key.len() == 1 => KeyCode::Char(key.chars().next().unwrap()),
         _ => KeyCode::Null,
     }
@@ -392,38 +396,62 @@ fn run_app(
             && let Event::Key(key) = event::read()?
             && key.kind == KeyEventKind::Press
         {
-            match key.code {
-                _ if matches_key(key.code, &app.config.quit) => {
-                    return Ok(());
+            if !app.search_mode {
+                match key.code {
+                    _ if matches_key(key.code, &app.config.quit) => {
+                        return Ok(());
+                    }
+                    _ if matches_key(key.code, &app.config.toggle_playback) => {
+                        toggle_playback(app);
+                    }
+                    _ if matches_key(key.code, &app.config.toggle_repeat) => {
+                        toggle_repeat(app);
+                    }
+                    _ if matches_key(key.code, &app.config.seek_backward) => {
+                        seek(app, -(app.config.seek_step as i64));
+                    }
+                    _ if matches_key(key.code, &app.config.seek_forward) => {
+                        seek(app, app.config.seek_step as i64);
+                    }
+                    _ if matches_key(key.code, &app.config.previous_track) => {
+                        next_track(app, -1);
+                    }
+                    _ if matches_key(key.code, &app.config.next_track) => {
+                        next_track(app, 1);
+                    }
+                    _ if matches_key(key.code, &app.config.hide_track) => {
+                        hide_track(app, app.current_track);
+                    }
+                    _ if matches_key(key.code, &app.config.toggle_metadata_panel) => {
+                        app.config.show_metadata_panel = !app.config.show_metadata_panel;
+                    }
+                    _ if matches_key(key.code, &app.config.search) => {
+                        app.search_mode = true;
+                        app.search_input = String::new();
+                    }
+                    _ if matches_key(key.code, &app.config.reload_config) => {
+                        app.config = load_config();
+                    }
+                    _ => {}
                 }
-                _ if matches_key(key.code, &app.config.toggle_playback) => {
-                    toggle_playback(app);
+            } else {
+                match key.code {
+                    KeyCode::Esc => {
+                        app.search_input = String::new();
+                        app.search_mode = false;
+                    }
+                    KeyCode::Enter => {
+                        app.tracks = scan_tracks(Some(app), &app.args)?;
+                        app.search_mode = false;
+                    }
+                    KeyCode::Backspace => {
+                        app.search_input.pop();
+                    }
+                    KeyCode::Char(c) => {
+                        app.search_input.push(c);
+                    }
+                    _ => {}
                 }
-                _ if matches_key(key.code, &app.config.toggle_repeat) => {
-                    toggle_repeat(app);
-                }
-                _ if matches_key(key.code, &app.config.seek_backward) => {
-                    seek(app, -(app.config.seek_step as i64));
-                }
-                _ if matches_key(key.code, &app.config.seek_forward) => {
-                    seek(app, app.config.seek_step as i64);
-                }
-                _ if matches_key(key.code, &app.config.previous_track) => {
-                    next_track(app, -1);
-                }
-                _ if matches_key(key.code, &app.config.next_track) => {
-                    next_track(app, 1);
-                }
-                _ if matches_key(key.code, &app.config.hide_track) => {
-                    hide_track(app, app.current_track);
-                }
-                _ if matches_key(key.code, &app.config.toggle_metadata_panel) => {
-                    app.config.show_metadata_panel = !app.config.show_metadata_panel;
-                }
-                _ if matches_key(key.code, &app.config.reload_config) => {
-                    app.config = load_config();
-                }
-                _ => {}
             }
         }
 
@@ -446,6 +474,7 @@ fn ui(f: &mut Frame, app: &App) {
     let show_metadata_title = app.config.show_metadata_title;
     let show_metadata_panel = app.config.show_metadata_panel;
     let show_progress_title = app.config.show_progress_title;
+    let show_search_title = app.config.show_search_title;
 
     let app_title_format = app
         .config
@@ -455,11 +484,13 @@ fn ui(f: &mut Frame, app: &App) {
     let playlist_title_format = app.config.playlist_title_format.clone();
     let metadata_title_format = app.config.metadata_title_format.clone();
     let progress_title_format = app.config.progress_title_format.clone();
+    let search_title_format = app.config.search_title_format.clone();
 
     let app_title_alignment = parse_alignment(&app.config.app_title_alignment);
     let playlist_title_alignment = parse_alignment(&app.config.playlist_title_alignment);
     let metadata_title_alignment = parse_alignment(&app.config.metadata_title_alignment);
     let progress_title_alignment = parse_alignment(&app.config.progress_title_alignment);
+    let search_title_alignment = parse_alignment(&app.config.search_title_alignment);
 
     let rounded_corners = app.config.rounded_corners;
 
@@ -467,6 +498,7 @@ fn ui(f: &mut Frame, app: &App) {
     let playlist_color = parse_color(&app.config.playlist_color);
     let metadata_color = parse_color(&app.config.metadata_color);
     let progress_color = parse_color(&app.config.progress_color);
+    let search_color = parse_color(&app.config.search_color);
 
     let mut list_state = app.list_state.clone();
     let track = &app.tracks[app.current_track];
@@ -701,6 +733,50 @@ fn ui(f: &mut Frame, app: &App) {
     };
 
     f.render_widget(progress_gauge, layout[2]);
+
+    if app.search_mode {
+        let area = centered_rect(50, 1, f.area());
+
+        f.render_widget(Clear, area);
+
+        let block = if show_search_title {
+            Block::default()
+                .borders(Borders::ALL)
+                .border_set(border_set)
+                .border_style(Style::default().fg(search_color))
+                .title(search_title_format)
+                .title_alignment(search_title_alignment)
+        } else {
+            Block::default()
+                .borders(Borders::ALL)
+                .border_set(border_set)
+                .border_style(Style::default().fg(search_color))
+        };
+
+        let input = Paragraph::new(app.search_input.as_str()).block(block);
+
+        f.render_widget(input, area);
+
+        f.set_cursor_position(Position {
+            x: area.x + app.search_input.len() as u16 + 1,
+            y: area.y + 1,
+        });
+    }
+}
+
+fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
+    let popup_w = (r.width as u32 * percent_x as u32 / 100) as u16;
+    let popup_h = (r.height as u32 * percent_y as u32 / 100) as u16;
+
+    let x = r.x + (r.width.saturating_sub(popup_w)) / 2;
+    let y = r.y + (r.height.saturating_sub(popup_h)) / 2;
+
+    Rect::new(
+        x,
+        y,
+        popup_w.max(10).min(r.width),
+        popup_h.max(3).min(r.height),
+    )
 }
 
 fn expand_tilde(path: &str) -> PathBuf {
@@ -713,6 +789,52 @@ fn expand_tilde(path: &str) -> PathBuf {
     PathBuf::from(path)
 }
 
+fn scan_tracks(app: Option<&App>, args: &Args) -> Result<Vec<Track>, Box<dyn Error>> {
+    let tracks = if args.playlist.is_some() {
+        let playlist_path = match args.playlist.as_deref() {
+            Some("") => ProjectDirs::from("", "", "sonido")
+                .unwrap()
+                .config_dir()
+                .join("playlist.txt"),
+            Some(path) => PathBuf::from(path),
+            None => PathBuf::new(),
+        };
+
+        scan_playlist_file(playlist_path, args.recursive, args.sort)?
+    } else {
+        scan_music_files(&args.path, args.recursive, args.sort)?
+    };
+
+    if app.is_some() {
+        let app = app.unwrap();
+
+        return Ok(tracks
+            .into_iter()
+            .filter(|t| {
+                if app.search_input.is_empty() {
+                    return true;
+                }
+
+                t.metadata
+                    .title
+                    .as_ref()
+                    .cloned()
+                    .unwrap_or_else(|| {
+                        t.path
+                            .file_stem()
+                            .and_then(|n| n.to_str())
+                            .unwrap_or("Unknown")
+                            .to_string()
+                    })
+                    .to_lowercase()
+                    .contains(&app.search_input.to_lowercase())
+            })
+            .collect());
+    }
+
+    Ok(tracks)
+}
+
 fn scan_playlist_file(
     path_buf: PathBuf,
     recursive: bool,
@@ -721,11 +843,11 @@ fn scan_playlist_file(
     let content = fs::read_to_string(path_buf)?;
     let vec_path_buf: Vec<PathBuf> = content.lines().map(expand_tilde).collect();
 
-    scan_music_files(vec_path_buf, recursive, sort)
+    scan_music_files(&vec_path_buf, recursive, sort)
 }
 
 fn scan_music_files(
-    vec_path_buf: Vec<PathBuf>,
+    vec_path_buf: &Vec<PathBuf>,
     recursive: bool,
     sort: bool,
 ) -> Result<Vec<Track>, Box<dyn Error>> {
