@@ -544,7 +544,7 @@ fn ui(f: &mut Frame, app: &App) {
                     .title(playlist_title_format)
                     .title_alignment(playlist_title_alignment),
             )
-            .highlight_style(Style::default().bold())
+            .highlight_style(Style::default().reversed())
     } else {
         List::new(items)
             .block(
@@ -553,7 +553,7 @@ fn ui(f: &mut Frame, app: &App) {
                     .border_set(border_set)
                     .border_style(Style::default().fg(playlist_color)),
             )
-            .highlight_style(Style::default().bold())
+            .highlight_style(Style::default().reversed())
     };
 
     f.render_stateful_widget(list, center_layout[0], &mut list_state);
@@ -569,7 +569,7 @@ fn ui(f: &mut Frame, app: &App) {
         f.render_stateful_widget(
             scrollbar,
             Rect {
-                x: center_layout[0].width.saturating_sub(2),
+                x: center_layout[0].width.saturating_sub(1),
                 y: center_layout[0].y.saturating_add(1),
                 width: 1,
                 height: center_layout[0].height.saturating_sub(2),
