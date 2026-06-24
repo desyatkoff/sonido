@@ -441,6 +441,15 @@ fn run_app(
                         app.search_mode = false;
                     }
                     KeyCode::Enter => {
+                        app.current_track = 0;
+                        app.playback_state = PlaybackState::Stopped;
+                        app.list_state = ListState::default().with_selected(Some(0));
+                        app.position = Duration::ZERO;
+                        app.playback_start = None;
+                        app.sink = None;
+                        app._stream = None;
+                        app.scroll_state = ScrollbarState::new(0);
+
                         app.tracks = scan_tracks(Some(app), &app.args)?;
                         app.search_mode = false;
                     }
@@ -467,7 +476,7 @@ fn run_app(
     }
 }
 
-fn ui(f: &mut Frame, app: &App) {
+fn ui(f: &mut Frame, app: &mut App) {
     let show_app_title = app.config.show_app_title;
     let show_playlist_title = app.config.show_playlist_title;
     let show_playlist_scrollbar = app.config.show_playlist_scrollbar;
@@ -501,8 +510,14 @@ fn ui(f: &mut Frame, app: &App) {
     let search_color = parse_color(&app.config.search_color);
 
     let mut list_state = app.list_state.clone();
-    let track = &app.tracks[app.current_track];
-    list_state.select(Some(app.current_track));
+
+    if app.tracks.is_empty() {
+        app.current_track = 0;
+        list_state.select(None);
+    } else {
+        app.current_track = app.current_track.min(app.tracks.len() - 1);
+        list_state.select(Some(app.current_track));
+    }
 
     let mut scrollbar_state = ScrollbarState::new(app.tracks.len()).position(app.current_track);
 
@@ -610,7 +625,13 @@ fn ui(f: &mut Frame, app: &App) {
         );
     }
 
-    let metadata = &track.metadata;
+    let default_metadata = Metadata::default();
+
+    let metadata = app
+        .tracks
+        .get(app.current_track)
+        .map(|track| &track.metadata)
+        .unwrap_or(&default_metadata);
 
     let lines = vec![
         Line::from(vec![
@@ -698,12 +719,23 @@ fn ui(f: &mut Frame, app: &App) {
         f.render_widget(metadata_widget, center_layout[1]);
     }
 
-    let progress = app.position.as_secs_f64() / track.duration.as_secs_f64();
-    let progress_text = format!(
-        "{} / {}",
-        format_duration(app.position),
-        format_duration(track.duration)
-    );
+    let progress: f64;
+    let progress_text: String;
+
+    if let Some(track) = app.tracks.get(app.current_track) {
+        progress = app.position.as_secs_f64() / track.duration.as_secs_f64();
+
+        progress_text = format!(
+            "{} / {}",
+            format_duration(app.position),
+            format_duration(track.duration)
+        );
+    } else {
+        progress = 0.0;
+
+        progress_text = "0:00 / 0:00".to_string();
+    }
+
     let progress_gauge = if show_progress_title {
         Gauge::default()
             .block(
@@ -918,6 +950,12 @@ fn format_duration(d: Duration) -> String {
 }
 
 fn toggle_playback(app: &mut App) {
+    let len = app.tracks.len() as i32;
+
+    if len < 1 {
+        return;
+    }
+
     match app.playback_state {
         PlaybackState::Playing => {
             if let Some(sink) = &app.sink {
@@ -946,6 +984,12 @@ fn toggle_repeat(app: &mut App) {
 }
 
 fn seek(app: &mut App, seconds: i64) {
+    let len = app.tracks.len() as i32;
+
+    if len < 1 {
+        return;
+    }
+
     let new_pos = app.position.as_secs() as i64 + seconds;
     let duration = app.tracks[app.current_track].duration.as_secs() as i64;
     let new_pos = new_pos.clamp(0, duration) as u64;
@@ -969,6 +1013,12 @@ fn seek(app: &mut App, seconds: i64) {
 }
 
 fn play_track(app: &mut App) {
+    let len = app.tracks.len() as i32;
+
+    if len < 1 {
+        return;
+    }
+
     if let Ok((stream, handle)) = OutputStream::try_default()
         && let Ok(file) = std::fs::File::open(&app.tracks[app.current_track].path)
         && let Ok(source) = Decoder::new(std::io::BufReader::new(file))
@@ -991,6 +1041,10 @@ fn play_track(app: &mut App) {
 fn next_track(app: &mut App, direction: i32) {
     let len = app.tracks.len() as i32;
 
+    if len < 1 {
+        return;
+    }
+
     app.current_track = (app.current_track as i32 + direction).rem_euclid(len) as usize;
     app.list_state.select(Some(app.current_track));
     app.position = Duration::ZERO;
@@ -1003,6 +1057,12 @@ fn next_track(app: &mut App, direction: i32) {
 }
 
 fn hide_track(app: &mut App, index: usize) {
+    let len = app.tracks.len() as i32;
+
+    if len < 1 {
+        return;
+    }
+
     app.tracks.remove(index);
 
     next_track(app, 0);
