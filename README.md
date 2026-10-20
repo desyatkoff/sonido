@@ -27,6 +27,7 @@ A sleek, terminal-based music player written in Rust
 * Navigate with only keyboard needed
 * Simple controls
 * Detailed metadata
+* MPRIS support for desktop media controls
 * Highly customizable
 
 ## Controls
